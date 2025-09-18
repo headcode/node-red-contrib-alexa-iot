@@ -7,7 +7,7 @@ const AlexaSmartHome = require('node-red-contrib-alexa-smart-home');
 const sanitizeHtml = require('sanitize-html');
 
 module.exports = function(RED) {
-    function AmazonEchoHubNode(config) {
+    function AmazonIOTHubNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { port = 80, debug = false } = RED.util.evaluateNodeProperty(config, 'config');
@@ -95,7 +95,7 @@ module.exports = function(RED) {
         async function getDevices(red) {
             const devices = [];
             red.nodes.eachNode(n => {
-                if (n.type === 'amazon-echo-device' && n.hub === node.id) {
+                if (n.type === 'amazon-iot-device' && n.hub === node.id) {
                     devices.push({ id: n.id, name: n.name });
                 }
             });
@@ -104,15 +104,16 @@ module.exports = function(RED) {
 
         app.use('/alexa', alexa.express());
         const server = app.listen(port, () => {
-            node.log(`Amazon Echo Hub listening on port ${port}`);
+            node.log(`Amazon IOT Hub listening on port ${port}`);
         });
 
         node.on('close', async (done) => {
             await new Promise(resolve => server.close(resolve));
-            node.log('Amazon Echo Hub closed');
+            node.log('Amazon IOT Hub closed');
             done();
         });
     }
 
-    RED.nodes.registerType('amazon-echo-hub', AmazonEchoHubNode);
+    RED.nodes.registerType('amazon-iot-hub', AmazonIOTHubNode);
+
 };
