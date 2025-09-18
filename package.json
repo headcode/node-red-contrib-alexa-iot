@@ -1,5 +1,5 @@
 {
-  "name": "node-red-contrib-amazon-echo",
+  "name": "node-red-contrib-amazon-iot",
   "version": "0.2.0",
   "description": "Alexa controlled Node-RED nodes for Amazon Echo devices, no Alexa Skills or cloud dependencies required",
   "main": "nodes/amazon-echo-hub.js",
@@ -19,12 +19,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/headcode/node-red-contrib-amazon-echo.git"
+    "url": "git+https://github.com/headcode/node-red-contrib-amazon-iot.git"
   },
   "bugs": {
-    "url": "https://github.com/headcode/node-red-contrib-amazon-echo/issues"
+    "url": "https://github.com/headcode/node-red-contrib-amazon-iot/issues"
   },
-  "homepage": "https://github.com/headcode/node-red-contrib-amazon-echo#readme",
+  "homepage": "https://github.com/headcode/node-red-contrib-amazon-iot#readme",
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
@@ -57,3 +57,4 @@
   }
 
 }
+
