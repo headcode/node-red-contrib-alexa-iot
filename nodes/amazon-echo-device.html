@@ -1,0 +1,97 @@
+<script type="text/javascript">
+    RED.nodes.registerType('amazon-echo-device', {
+        category: 'output',
+        color: '#FF9900',
+        defaults: {
+            name: { value: '', required: true },
+            hub: { type: 'amazon-echo-hub', required: true },
+            targetNode: { value: '' }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'light.png',
+        label: function() {
+            return this.name || 'Amazon Echo Device';
+        },
+        labelStyle: function() {
+            return this.name ? 'node_label_italic' : '';
+        },
+        oneditprepare: function() {
+            const node = this;
+            const targetSelect = document.getElementById('node-input-targetNode');
+            document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
+            document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Amazon Echo Hub');
+            targetSelect.setAttribute('aria-label', 'Select target node to forward messages to');
+
+            // Populate dropdown with all available nodes
+            const nodes = RED.nodes.nodes();
+            targetSelect.innerHTML = '<option value="">None (use wire output only)</option>';
+            nodes.forEach(n => {
+                const option = document.createElement('option');
+                option.value = n.id;
+                option.textContent = `${n.type}: ${n.name || n.id}`;
+                targetSelect.appendChild(option);
+            });
+
+            // Set selected value if configured
+            if (node.targetNode) {
+                targetSelect.value = node.targetNode;
+            }
+
+            // Listen for changes to refresh if needed (optional, for dynamic updates)
+            targetSelect.addEventListener('change', function() {
+                // Could add logic to validate or update preview here if desired
+            });
+        },
+        oneditsave: function() {
+            const name = document.getElementById('node-input-name').value.trim();
+            const targetNode = document.getElementById('node-input-targetNode').value;
+            if (!name) {
+                RED.notify('Device name is required', 'error');
+                return false;
+            }
+            // Optional: Warn if target node ID is invalid (but since populated dynamically, it should be valid)
+            if (targetNode && !RED.nodes.node(targetNode)) {
+                RED.notify('Selected target node may no longer exist', 'warning');
+            }
+            this.targetNode = targetNode;
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="amazon-echo-device">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Device Name" aria-label="Device name for Alexa">
+    </div>
+    <div class="form-row">
+        <label for="node-input-hub"><i class="fa fa-server"></i> Hub</label>
+        <input type="text" id="node-input-hub" aria-label="Select Amazon Echo Hub">
+    </div>
+    <div class="form-row">
+        <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node</label>
+        <select id="node-input-targetNode" aria-label="Select target node to forward messages to">
+            <option value="">None (use wire output only)</option>
+        </select>
+    </div>
+</script>
+
+<style>
+    .form-row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .form-row label {
+        text-align: right;
+        padding-right: 10px;
+    }
+    .form-row input[type="text"],
+    .form-row select {
+        width: 200px;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+    }
+</style>
