@@ -57,6 +57,7 @@ module.exports = function(RED) {
         });
     }
 
-    RED.nodes.registerType('amazon-echo-device', AmazonEchoDeviceNode);
+    RED.nodes.registerType('amazon-iot-device', AmazonIOTDeviceNode);
 
 };
+
