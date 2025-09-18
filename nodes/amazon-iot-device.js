@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function(RED) {
-    function AmazonEchoDeviceNode(config) {
+    function AmazonIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { name, hub, targetNode } = config;
@@ -58,4 +58,5 @@ module.exports = function(RED) {
     }
 
     RED.nodes.registerType('amazon-echo-device', AmazonEchoDeviceNode);
+
 };
