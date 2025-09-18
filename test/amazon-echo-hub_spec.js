@@ -4,7 +4,7 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 const RED = require('node-red');
 
-describe('Amazon Echo Hub Node', () => {
+describe('Amazon IOT Hub Node', () => {
     let node, REDMock;
 
     beforeEach(() => {
@@ -12,9 +12,9 @@ describe('Amazon Echo Hub Node', () => {
             nodes: {
                 createNode: sinon.spy(),
                 registerType: sinon.spy(),
-                getNode: sinon.stub().returns({ id: 'device1', name: 'TestDevice', type: 'amazon-echo-device', hub: 'hub1' }),
+                getNode: sinon.stub().returns({ id: 'device1', name: 'TestDevice', type: 'amazon-iot-device', hub: 'hub1' }),
                 eachNode: sinon.stub().callsArgWith(0, [
-                    { id: 'device1', name: 'TestDevice', type: 'amazon-echo-device', hub: 'hub1' }
+                    { id: 'device1', name: 'TestDevice', type: 'amazon-iot-device', hub: 'hub1' }
                 ])
             },
             log: sinon.spy(),
@@ -22,12 +22,12 @@ describe('Amazon Echo Hub Node', () => {
                 evaluateNodeProperty: sinon.stub().returns({ port: 80, debug: false })
             }
         };
-        require('../nodes/amazon-echo-hub')(REDMock);
+        require('../nodes/amazon-iot-hub')(REDMock);
         node = REDMock.nodes.registerType.args[0][1];
     });
 
     it('should register the node', () => {
-        expect(REDMock.nodes.registerType.calledWith('amazon-echo-hub')).to.be.true;
+        expect(REDMock.nodes.registerType.calledWith('amazon-iot-hub')).to.be.true;
     });
 
     it('should initialize with default port', () => {
@@ -39,9 +39,10 @@ describe('Amazon Echo Hub Node', () => {
     it('should close server on node close', (done) => {
         const instance = new node({ id: 'hub1', port: '80' });
         instance.on('close', () => {
-            expect(REDMock.log.calledWith('Amazon Echo Hub closed')).to.be.true;
+            expect(REDMock.log.calledWith('Amazon IOT Hub closed')).to.be.true;
             done();
         });
         instance.emit('close', done);
     });
+
 });
