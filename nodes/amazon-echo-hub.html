@@ -1,5 +1,5 @@
 <script type="text/javascript">
-    RED.nodes.registerType('amazon-echo-hub', {
+    RED.nodes.registerType('amazon-iot-hub', {
         category: 'input',
         color: '#FF9900',
         defaults: {
@@ -11,7 +11,7 @@
         outputs: 0,
         icon: 'bridge.png',
         label: function() {
-            return this.name || 'Amazon Echo Hub';
+            return this.name || 'Amazon IOT Hub';
         },
         labelStyle: function() {
             return this.name ? 'node_label_italic' : '';
@@ -31,7 +31,7 @@
     });
 </script>
 
-<script type="text/html" data-template-name="amazon-echo-hub">
+<script type="text/html" data-template-name="amazon-iot-hub">
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name" aria-label="Node name">
@@ -64,4 +64,5 @@
         border: 1px solid #ccc;
         border-radius: 3px;
     }
+
 </style>
