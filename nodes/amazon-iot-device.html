@@ -1,17 +1,17 @@
 <script type="text/javascript">
-    RED.nodes.registerType('amazon-echo-device', {
+    RED.nodes.registerType('amazon-iot-device', {
         category: 'output',
         color: '#FF9900',
         defaults: {
             name: { value: '', required: true },
-            hub: { type: 'amazon-echo-hub', required: true },
+            hub: { type: 'amazon-iot-hub', required: true },
             targetNode: { value: '' }
         },
         inputs: 1,
         outputs: 1,
         icon: 'light.png',
         label: function() {
-            return this.name || 'Amazon Echo Device';
+            return this.name || 'Amazon IOT Device';
         },
         labelStyle: function() {
             return this.name ? 'node_label_italic' : '';
@@ -20,7 +20,7 @@
             const node = this;
             const targetSelect = document.getElementById('node-input-targetNode');
             document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
-            document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Amazon Echo Hub');
+            document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Amazon IOT Hub');
             targetSelect.setAttribute('aria-label', 'Select target node to forward messages to');
 
             // Populate dropdown with all available nodes
@@ -59,14 +59,14 @@
     });
 </script>
 
-<script type="text/html" data-template-name="amazon-echo-device">
+<script type="text/html" data-template-name="amazon-iot-device">
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Device Name" aria-label="Device name for Alexa">
     </div>
     <div class="form-row">
         <label for="node-input-hub"><i class="fa fa-server"></i> Hub</label>
-        <input type="text" id="node-input-hub" aria-label="Select Amazon Echo Hub">
+        <input type="text" id="node-input-hub" aria-label="Select Amazon IOT Hub">
     </div>
     <div class="form-row">
         <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node</label>
@@ -94,4 +94,5 @@
         border: 1px solid #ccc;
         border-radius: 3px;
     }
+
 </style>
