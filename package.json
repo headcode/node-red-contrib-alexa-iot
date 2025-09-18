@@ -47,7 +47,7 @@
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "express-rate-limit": "^7.4.0",
-    "node-red-contrib-alexa-smart-home": "^1.0.0",
+    "node-red-contrib-alexa-smart-home": "^0.4.68",
     "sanitize-html": "^2.13.0"
   },
   "devDependencies": {
@@ -55,4 +55,5 @@
     "chai": "^5.1.1",
     "sinon": "^18.0.0"
   }
+
 }
