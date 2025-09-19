@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-amazon-iot",
-  "version": "0.2.1",
+  "version": "0.2.0",
   "description": "Alexa controlled Node-RED nodes for Amazon Echo devices, no Alexa Skills or cloud dependencies required",
   "main": "nodes/amazon-iot-hub.js",
   "scripts": {
@@ -57,4 +57,5 @@
     "sinon": "^18.0.0"
   }
 }
+
 
