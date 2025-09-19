@@ -7,8 +7,8 @@
             port: { value: '80', required: true, validate: RED.validators.number() },
             debug: { value: false }
         },
-        inputs: 0,
-        outputs: 0,
+        inputs: 1,
+        outputs: 1,
         icon: 'bridge.png',
         label: function() {
             return this.name || 'Amazon IOT Hub';
@@ -66,3 +66,4 @@
     }
 
 </style>
+
