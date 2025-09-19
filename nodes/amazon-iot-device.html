@@ -24,13 +24,14 @@
             targetSelect.setAttribute('aria-label', 'Select target node to forward messages to');
 
             // Populate dropdown with all available nodes
-            const nodes = RED.nodes.nodes();
             targetSelect.innerHTML = '<option value="">None (use wire output only)</option>';
-            nodes.forEach(n => {
-                const option = document.createElement('option');
-                option.value = n.id;
-                option.textContent = `${n.type}: ${n.name || n.id}`;
-                targetSelect.appendChild(option);
+            RED.nodes.eachNode(n => {
+                if (n.type !== 'amazon-iot-device' && n.type !== 'amazon-iot-hub') { // Exclude self and hub
+                    const option = document.createElement('option');
+                    option.value = n.id;
+                    option.textContent = `${n.type}${n.name ? ': ' + n.name : ''} (${n.id})`;
+                    targetSelect.appendChild(option);
+                }
             });
 
             // Set selected value if configured
@@ -38,9 +39,9 @@
                 targetSelect.value = node.targetNode;
             }
 
-            // Listen for changes to refresh if needed (optional, for dynamic updates)
+            // Listen for changes to update node configuration
             targetSelect.addEventListener('change', function() {
-                // Could add logic to validate or update preview here if desired
+                node.targetNode = this.value;
             });
         },
         oneditsave: function() {
@@ -48,9 +49,8 @@
             const targetNode = document.getElementById('node-input-targetNode').value;
             if (!name) {
                 RED.notify('Device name is required', 'error');
-                return false;
+                throw new Error('Device name is required');
             }
-            // Optional: Warn if target node ID is invalid (but since populated dynamically, it should be valid)
             if (targetNode && !RED.nodes.node(targetNode)) {
                 RED.notify('Selected target node may no longer exist', 'warning');
             }
@@ -94,5 +94,4 @@
         border: 1px solid #ccc;
         border-radius: 3px;
     }
-
 </style>
