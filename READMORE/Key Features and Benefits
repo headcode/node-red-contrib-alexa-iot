@@ -1,0 +1,7 @@
+Key Features and Benefits
+
+Local Control: The module operates without cloud dependencies, using node-red-contrib-alexa-smart-home for local Alexa communication.
+Multiple Device Support: Multiple alexa-iot-device nodes can be linked to a single hub, each with a unique name for Alexa to recognize.
+Flexible Capabilities: Supports power (on/off), brightness, and color control, suitable for devices like smart lights and switches.
+Security: Uses helmet and express-rate-limit for the hub’s server and sanitize-html to secure device names.
+Integration: The targetNode feature allows device nodes to forward messages to other Node-RED nodes, enabling complex automation flows.
