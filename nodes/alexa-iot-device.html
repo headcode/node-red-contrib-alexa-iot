@@ -43,6 +43,13 @@
             targetSelect.addEventListener('change', function() {
                 node.targetNode = this.value;
             });
+
+            // Automatically set hub field if exactly one alexa-iot-hub exists in the workspace
+            const hubNodes = RED.nodes.nodes.filter(n => n.type === 'alexa-iot-hub');
+            if (hubNodes.length === 1) {
+                document.getElementById('node-input-hub').value = hubNodes[0].id;
+                node.hub = hubNodes[0].id;
+            }
         },
         oneditsave: function() {
             const name = document.getElementById('node-input-name').value.trim();
@@ -95,4 +102,3 @@
         border-radius: 3px;
     }
 </style>
-
