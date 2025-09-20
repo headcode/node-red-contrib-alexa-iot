@@ -56,8 +56,6 @@ module.exports = function(RED) {
             }
         });
     }
-    RED.nodes.registerType('amazon-iot-device', AmazonIOTDeviceNode);
+    RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
-
-
