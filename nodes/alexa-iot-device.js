@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function(RED) {
-    function AmazonIOTDeviceNode(config) {
+    function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { name, hub, targetNode } = config;
@@ -56,8 +56,8 @@ module.exports = function(RED) {
             }
         });
     }
-
     RED.nodes.registerType('amazon-iot-device', AmazonIOTDeviceNode);
 
 };
+
 
