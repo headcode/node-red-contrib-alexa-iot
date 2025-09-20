@@ -1,5 +1,3 @@
-'use strict';
-
 export default function(RED) {
     function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
@@ -59,5 +57,6 @@ export default function(RED) {
     RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
+
 
 
