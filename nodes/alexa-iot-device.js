@@ -17,7 +17,7 @@ module.exports = function(RED) {
             return;
         }
 
-        node.on('input', async (msg, send, done) => {
+        node.on('input', (msg, send, done) => {
             try {
                 const { payload, topic } = msg;
                 let output = { ...msg };
@@ -59,3 +59,4 @@ module.exports = function(RED) {
     RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
+
