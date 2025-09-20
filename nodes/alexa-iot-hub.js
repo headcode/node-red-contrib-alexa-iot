@@ -10,7 +10,7 @@ module.exports = function(RED) {
     function AlexaIOTHubNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const { port = 80, debug = false } = RED.util.evaluateNodeProperty(config, 'config');
+        const { port = 80, debug = false } = config;
 
         const app = express();
         app.use(helmet());
@@ -116,3 +116,4 @@ module.exports = function(RED) {
 
     RED.nodes.registerType('alexa-iot-hub', AlexaIOTHubNode);
 };
+
