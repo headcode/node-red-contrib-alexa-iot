@@ -1,12 +1,10 @@
-'use strict';
+import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import AlexaSmartHome from 'node-red-contrib-alexa-smart-home';
+import sanitizeHtml from 'sanitize-html';
 
-const express = require('express');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const AlexaSmartHome = require('node-red-contrib-alexa-smart-home');
-const sanitizeHtml = require('sanitize-html');
-
-module.exports = function(RED) {
+export default function(RED) {
     function AlexaIOTHubNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
@@ -116,4 +114,5 @@ module.exports = function(RED) {
 
     RED.nodes.registerType('alexa-iot-hub', AlexaIOTHubNode);
 };
+
 
