@@ -1,7 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import AlexaSmartHome from 'node-red-contrib-alexa-smart-home';
+import AlexaSmartHome from 'node-red-contrib-alexa-smart-home/alexa.js';
 import sanitizeHtml from 'sanitize-html';
 
 export default function(RED) {
@@ -114,5 +114,6 @@ export default function(RED) {
 
     RED.nodes.registerType('alexa-iot-hub', AlexaIOTHubNode);
 };
+
 
 
