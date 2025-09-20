@@ -1,6 +1,9 @@
 Potential Considerations
 
 Port Configuration: The default port (80) may conflict with other services. Users must ensure the port is free or configure a different one.
+
 Device Name Uniqueness: Since device names are used as friendlyName in Alexa, users must ensure they are unique to avoid conflicts during discovery.
+
 Dependency on node-red-contrib-alexa-smart-home: The module relies on this package for Alexa communication, so any limitations or updates in that package may affect functionality.
+
 Error Handling: The module includes basic error handling (e.g., missing hub, invalid target node), but users should monitor logs in debug mode for troubleshooting.
