@@ -57,8 +57,3 @@ export default function(RED) {
     RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
-
-
-
-
-
