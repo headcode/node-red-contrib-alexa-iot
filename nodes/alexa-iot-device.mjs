@@ -15,7 +15,7 @@ export default function(RED) {
             return;
         }
 
-        node.on('input', (msg, send, done) => {
+        node.on('output', (msg, send, done) => {
             try {
                 const { payload, topic } = msg;
                 let output = { ...msg };
@@ -57,6 +57,7 @@ export default function(RED) {
     RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
+
 
 
 
