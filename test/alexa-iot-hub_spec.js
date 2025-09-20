@@ -4,7 +4,7 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 const RED = require('node-red');
 
-describe('Amazon IOT Hub Node', () => {
+describe('Alexa IOT Hub Node', () => {
     let node, REDMock;
 
     beforeEach(() => {
@@ -12,9 +12,9 @@ describe('Amazon IOT Hub Node', () => {
             nodes: {
                 createNode: sinon.spy(),
                 registerType: sinon.spy(),
-                getNode: sinon.stub().returns({ id: 'device1', name: 'TestDevice', type: 'amazon-iot-device', hub: 'hub1' }),
+                getNode: sinon.stub().returns({ id: 'device1', name: 'TestDevice', type: 'alexa-iot-device', hub: 'hub1' }),
                 eachNode: sinon.stub().callsArgWith(0, [
-                    { id: 'device1', name: 'TestDevice', type: 'amazon-iot-device', hub: 'hub1' }
+                    { id: 'device1', name: 'TestDevice', type: 'alexa-iot-device', hub: 'hub1' }
                 ])
             },
             log: sinon.spy(),
@@ -22,12 +22,12 @@ describe('Amazon IOT Hub Node', () => {
                 evaluateNodeProperty: sinon.stub().returns({ port: 80, debug: false })
             }
         };
-        require('../nodes/amazon-iot-hub')(REDMock);
+        require('../nodes/alexa-iot-hub')(REDMock);
         node = REDMock.nodes.registerType.args[0][1];
     });
 
     it('should register the node', () => {
-        expect(REDMock.nodes.registerType.calledWith('amazon-iot-hub')).to.be.true;
+        expect(REDMock.nodes.registerType.calledWith('alexa-iot-hub')).to.be.true;
     });
 
     it('should initialize with default port', () => {
@@ -39,10 +39,11 @@ describe('Amazon IOT Hub Node', () => {
     it('should close server on node close', (done) => {
         const instance = new node({ id: 'hub1', port: '80' });
         instance.on('close', () => {
-            expect(REDMock.log.calledWith('Amazon IOT Hub closed')).to.be.true;
+            expect(REDMock.log.calledWith('Alexa IOT Hub closed')).to.be.true;
             done();
         });
         instance.emit('close', done);
     });
 
 });
+
