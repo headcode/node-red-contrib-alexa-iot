@@ -1,17 +1,17 @@
 <script type="text/javascript">
-    RED.nodes.registerType('amazon-iot-device', {
+    RED.nodes.registerType('alexa-iot-device', {
         category: 'output',
         color: '#FF9900',
         defaults: {
             name: { value: '', required: true },
-            hub: { type: 'amazon-iot-hub', required: true },
+            hub: { type: 'alexa-iot-hub', required: true },
             targetNode: { value: '' }
         },
         inputs: 1,
         outputs: 1,
         icon: 'light.png',
         label: function() {
-            return this.name || 'Amazon IOT Device';
+            return this.name || 'Alexa IOT Device';
         },
         labelStyle: function() {
             return this.name ? 'node_label_italic' : '';
@@ -20,13 +20,13 @@
             const node = this;
             const targetSelect = document.getElementById('node-input-targetNode');
             document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
-            document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Amazon IOT Hub');
+            document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Alexa IOT Hub');
             targetSelect.setAttribute('aria-label', 'Select target node to forward messages to');
 
             // Populate dropdown with all available nodes
             targetSelect.innerHTML = '<option value="">None (use wire output only)</option>';
             RED.nodes.eachNode(n => {
-                if (n.type !== 'amazon-iot-device' && n.type !== 'amazon-iot-hub') { // Exclude self and hub
+                if (n.type !== 'alexa-iot-device' && n.type !== 'alexa-iot-hub') { // Exclude self and hub
                     const option = document.createElement('option');
                     option.value = n.id;
                     option.textContent = `${n.type}${n.name ? ': ' + n.name : ''} (${n.id})`;
@@ -59,14 +59,14 @@
     });
 </script>
 
-<script type="text/html" data-template-name="amazon-iot-device">
+<script type="text/html" data-template-name="alexa-iot-device">
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Device Name" aria-label="Device name for Alexa">
     </div>
     <div class="form-row">
         <label for="node-input-hub"><i class="fa fa-server"></i> Hub</label>
-        <input type="text" id="node-input-hub" aria-label="Select Amazon IOT Hub">
+        <input type="text" id="node-input-hub" aria-label="Select Alexa IOT Hub">
     </div>
     <div class="form-row">
         <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node</label>
