@@ -114,6 +114,3 @@ export default function(RED) {
 
     RED.nodes.registerType('alexa-iot-hub', AlexaIOTHubNode);
 };
-
-
-
