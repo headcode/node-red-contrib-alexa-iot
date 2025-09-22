@@ -18,31 +18,12 @@
         },
         oneditprepare: function() {
             const node = this;
-            const targetSelect = document.getElementById('node-input-targetNode');
             document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
             document.getElementById('node-input-hub').setAttribute('aria-label', 'Select Alexa IOT Hub');
-            targetSelect.setAttribute('aria-label', 'Select target node to forward messages to');
+            document.getElementById('node-input-targetNode').setAttribute('aria-label', 'Enter target node ID');
 
-            // Populate dropdown with all available nodes
-            targetSelect.innerHTML = '<option value="">None (use wire output only)</option>';
-            RED.nodes.eachNode(n => {
-                if (n.type !== 'alexa-iot-device' && n.type !== 'alexa-iot-hub') { // Exclude self and hub
-                    const option = document.createElement('option');
-                    option.value = n.id;
-                    option.textContent = `${n.type}${n.name ? ': ' + n.name : ''} (${n.id})`;
-                    targetSelect.appendChild(option);
-                }
-            });
-
-            // Set selected value if configured
-            if (node.targetNode) {
-                targetSelect.value = node.targetNode;
-            }
-
-            // Listen for changes to update node configuration
-            targetSelect.addEventListener('change', function() {
-                node.targetNode = this.value;
-            });
+            // Set the textbox value if configured
+            document.getElementById('node-input-targetNode').value = node.targetNode || '';
 
             // Automatically set hub field if exactly one alexa-iot-hub exists in the workspace
             const hubNodes = RED.nodes.nodes.filter(n => n.type === 'alexa-iot-hub');
@@ -53,13 +34,13 @@
         },
         oneditsave: function() {
             const name = document.getElementById('node-input-name').value.trim();
-            const targetNode = document.getElementById('node-input-targetNode').value;
+            const targetNode = document.getElementById('node-input-targetNode').value.trim();
             if (!name) {
                 RED.notify('Device name is required', 'error');
                 throw new Error('Device name is required');
             }
             if (targetNode && !RED.nodes.node(targetNode)) {
-                RED.notify('Selected target node may no longer exist', 'warning');
+                RED.notify('Target node may no longer exist', 'warning');
             }
             this.targetNode = targetNode;
         }
@@ -76,10 +57,8 @@
         <input type="text" id="node-input-hub" aria-label="Select Alexa IOT Hub">
     </div>
     <div class="form-row">
-        <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node</label>
-        <select id="node-input-targetNode" aria-label="Select target node to forward messages to">
-            <option value="">None (use wire output only)</option>
-        </select>
+        <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node ID</label>
+        <input type="text" id="node-input-targetNode" placeholder="Enter target node ID" aria-label="Enter target node ID">
     </div>
 </script>
 
