@@ -46,4 +46,3 @@ describe('Alexa IOT Hub Node', () => {
     });
 
 });
-
