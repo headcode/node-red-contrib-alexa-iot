@@ -1,4 +1,4 @@
-export default function(RED) {
+module.exports = function(RED) {
     function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
@@ -57,3 +57,4 @@ export default function(RED) {
     RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
 };
+
