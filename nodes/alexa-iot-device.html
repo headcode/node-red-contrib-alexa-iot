@@ -40,7 +40,8 @@
                 throw new Error('Device name is required');
             }
             if (targetNode && !RED.nodes.node(targetNode)) {
-                RED.notify('Target node may no longer exist', 'warning');
+                RED.notify('Invalid target node ID', 'error');
+                throw new Error('Invalid target node ID');
             }
             this.targetNode = targetNode;
         }
@@ -81,3 +82,4 @@
         border-radius: 3px;
     }
 </style>
+
