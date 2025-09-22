@@ -1,3 +1,5 @@
+'use strict';
+
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -114,3 +116,4 @@ module.exports = function(RED) {
 
     RED.nodes.registerType('alexa-iot-hub', AlexaIOTHubNode);
 };
+
