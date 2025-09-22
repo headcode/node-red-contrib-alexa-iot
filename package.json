@@ -3,6 +3,7 @@
     "version": "0.2.0",
     "description": "Alexa controlled Node-RED nodes for Amazon Echo devices, no Alexa Skills or cloud dependencies required",
     "main": "nodes/alexa-iot-hub.mjs",
+    "type": "module",
     "scripts": {
         "test": "mocha test/**/*_spec.js --exit"
     },
