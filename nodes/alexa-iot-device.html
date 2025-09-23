@@ -4,7 +4,7 @@
         color: '#FF9900',
         defaults: {
             name: { value: '', required: true },
-            hub: { value: '', type: 'alexa-iot-hub', required: true },
+            hub: { value: '', required: true },
             targetNode: { value: '' }
         },
         inputs: 1,
@@ -19,34 +19,24 @@
         oneditprepare: function() {
             const node = this;
             document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
+            document.getElementById('node-input-hub').setAttribute('aria-label', 'Enter Alexa IOT Hub ID');
             document.getElementById('node-input-targetNode').setAttribute('aria-label', 'Enter target node ID');
 
-            // Initialize hub field as typedInput for alexa-iot-hub nodes
-            $("#node-input-hub").typedInput({
-                type: 'alexa-iot-hub',
-                types: ['alexa-iot-hub']
-            }).typedInput('type', 'alexa-iot-hub');
-
-            // Automatically set hub field if exactly one alexa-iot-hub exists
-            const hubNodes = RED.nodes.nodes.filter(n => n.type === 'alexa-iot-hub');
-            if (hubNodes.length === 1) {
-                $("#node-input-hub").typedInput('value', hubNodes[0].id);
-                node.hub = hubNodes[0].id;
-            } else if (node.hub) {
-                $("#node-input-hub").typedInput('value', node.hub);
-            }
+            // Set the textbox values if configured
+            document.getElementById('node-input-hub').value = node.hub || '';
+            document.getElementById('node-input-targetNode').value = node.targetNode || '';
         },
         oneditsave: function() {
             const name = document.getElementById('node-input-name').value.trim();
-            const hub = $("#node-input-hub").typedInput('value');
+            const hub = document.getElementById('node-input-hub').value.trim();
             const targetNode = document.getElementById('node-input-targetNode').value.trim();
             if (!name) {
                 RED.notify('Device name is required', 'error');
                 throw new Error('Device name is required');
             }
-            if (!hub || !RED.nodes.node(hub)) {
-                RED.notify('A valid Alexa IOT Hub is required', 'error');
-                throw new Error('A valid Alexa IOT Hub is required');
+            if (!hub || !RED.nodes.node(hub) || RED.nodes.node(hub).type !== 'alexa-iot-hub') {
+                RED.notify('A valid Alexa IOT Hub ID is required', 'error');
+                throw new Error('A valid Alexa IOT Hub ID is required');
             }
             if (targetNode && !RED.nodes.node(targetNode)) {
                 RED.notify('Invalid target node ID', 'error');
@@ -64,8 +54,8 @@
         <input type="text" id="node-input-name" placeholder="Device Name" aria-label="Device name for Alexa">
     </div>
     <div class="form-row">
-        <label for="node-input-hub"><i class="fa fa-server"></i> Hub</label>
-        <input type="text" id="node-input-hub" aria-label="Select Alexa IOT Hub">
+        <label for="node-input-hub"><i class="fa fa-server"></i> Hub ID</label>
+        <input type="text" id="node-input-hub" placeholder="Enter Alexa IOT Hub ID" aria-label="Enter Alexa IOT Hub ID">
     </div>
     <div class="form-row">
         <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node ID</label>
@@ -79,16 +69,16 @@
     <h4>Configuration</h4>
     <ul>
         <li><strong>Name</strong>: The device name as it will appear in Alexa (e.g., "Living Room Light"). Required.</li>
-        <li><strong>Hub</strong>: The Alexa IOT Hub node to connect to. Automatically selected if only one hub exists.</li>
+        <li><strong>Hub ID</strong>: The ID of the Alexa IOT Hub node to connect to. Required.</li>
         <li><strong>Target Node ID</strong>: The ID of another node to forward messages to (optional). Leave blank to use the output wire.</li>
     </ul>
     <h4>Finding a Node ID</h4>
-    <p>To find the ID of a target node:</p>
+    <p>To find the ID of a hub or target node:</p>
     <ol>
-        <li><strong>Node Properties</strong>: Double-click a node in the editor. The ID is shown at the bottom of the configuration panel (e.g., "123abc45.678def"). Copy and paste it into the Target Node ID field.</li>
+        <li><strong>Node Properties</strong>: Double-click a node in the editor. The ID is shown at the bottom of the configuration panel (e.g., "123abc45.678def"). Copy and paste it into the Hub ID or Target Node ID field.</li>
         <li><strong>Flow JSON</strong>: Click the menu (☰) > Export > Clipboard, select "all flows," and export. Open the JSON in a text editor and find the node’s <code>id</code> field (e.g., <code>"id": "123abc45.678def"</code>).</li>
     </ol>
-    <p><strong>Note</strong>: If the Target Node ID is invalid or the node no longer exists, a warning will appear when saving the configuration.</p>
+    <p><strong>Note</strong>: The Hub ID must correspond to an Alexa IOT Hub node, and the Target Node ID (if used) must correspond to a valid node. Invalid IDs will prevent saving the configuration.</p>
 </script>
 
 <style>
