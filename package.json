@@ -13,19 +13,22 @@
         "amazon-echo",
         "smart-home",
         "iot",
+        "home-assistant",
         "voice-assistant",
-        "local-alexa"
+        "local-alexa",
+        "voice-control",
+        "home-automation"
     ],
     "author": "headcode",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/YOUR_USERNAME/node-red-contrib-alexa-iot.git"
+        "url": "git+https://github.com/headcode/node-red-contrib-alexa-iot.git"
     },
     "bugs": {
-        "url": "https://github.com/YOUR_USERNAME/node-red-contrib-alexa-iot/issues"
+        "url": "https://github.com/headcode/node-red-contrib-alexa-iot/issues"
     },
-    "homepage": "https://github.com/YOUR_USERNAME/node-red-contrib-alexa-iot#readme",
+    "homepage": "https://github.com/headcode/node-red-contrib-alexa-iot#readme",
     "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.0.0"
@@ -39,10 +42,11 @@
     },
     "files": [
         "nodes",
-        "test"
+        "test",
+        "README.md"
     ],
     "dependencies": {
-        "express": "^5.1.0",
+        "express": "^4.21.1",
         "helmet": "^8.1.0",
         "express-rate-limit": "^8.1.0",
         "sanitize-html": "^2.17.0"
