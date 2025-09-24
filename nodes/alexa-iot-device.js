@@ -10,7 +10,7 @@ module.exports = function(RED) {
     function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const { name, hub, targetNode } = config;
+        const { name, hub, targetNode, topic } = config; // Added topic
 
         // Validate configuration
         if (!name || !hub) {
@@ -31,26 +31,35 @@ module.exports = function(RED) {
             return;
         }
 
+        // Store custom topic
+        node.topic = topic;
+
         // Set initial status
         node.status({ fill: 'green', shape: 'dot', text: 'connected to hub' });
 
         node.on('input', (msg, send, done) => {
             try {
-                const { payload, topic } = msg;
-                let output = { ...msg };
+                const { payload } = msg;
+                // Use custom topic if defined, else fall back to incoming msg.topic
+                const outputTopic = node.topic || msg.topic;
+                let output = { topic: outputTopic, payload: msg.payload };
 
-                if (topic === 'power') {
+                if (outputTopic === 'power' || (!node.topic && msg.topic === 'power')) {
                     const state = payload === true || payload === 'ON' ? 'ON' : 'OFF';
                     RED.util.setMessageProperty(output, 'payload', state, true);
-                } else if (topic === 'brightness') {
+                } else if (outputTopic === 'brightness' || (!node.topic && msg.topic === 'brightness')) {
                     const brightness = Math.max(0, Math.min(100, Number(payload)));
                     RED.util.setMessageProperty(output, 'payload', brightness, true);
-                } else if (topic === 'color') {
+                } else if (outputTopic === 'color' || (!node.topic && msg.topic === 'color')) {
                     RED.util.setMessageProperty(output, 'payload', payload, true);
                 } else {
-                    node.warn(`Unsupported topic: ${topic}`);
+                    node.warn(`Unsupported topic: ${outputTopic}`);
                     done();
                     return;
+                }
+
+                if (node.topic) {
+                    node.debug(`Using custom topic: ${node.topic}`);
                 }
 
                 send(output);
