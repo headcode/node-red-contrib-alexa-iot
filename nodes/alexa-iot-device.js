@@ -12,33 +12,51 @@ module.exports = function(RED) {
         const node = this;
         const { name, hub, targetNode, topic } = config;
 
-        // Validate configuration
-        if (!name || !hub) {
-            node.error(`Missing name or hub configuration. Name: ${name}, Hub ID: ${hub}`);
-            node.status({ fill: 'red', shape: 'ring', text: 'missing config' });
-            return;
-        }
-
-        const hubNode = RED.nodes.getNode(hub);
-        if (!hubNode) {
-            node.error(`Hub node not found for ID: ${hub}. Ensure the Alexa IOT Hub node is deployed.`);
-            node.status({ fill: 'red', shape: 'ring', text: `no hub: ${hub}` });
-            return;
-        }
-        if (hubNode.type !== 'alexa-iot-hub') {
-            node.error(`Invalid hub type for ID ${hub}: expected alexa-iot-hub, got ${hubNode.type}`);
-            node.status({ fill: 'red', shape: 'ring', text: `invalid hub: ${hubNode.type}` });
-            return;
-        }
-
-        // Store custom topic
+        // Store custom topic and name
         node.topic = topic;
+        node.name = name;
+        node.hubId = hub;
 
-        // Set initial status
-        node.status({ fill: 'green', shape: 'dot', text: 'linked to hub' });
+        // Function to validate hub and update status
+        function validateHub() {
+            if (!node.hubId) {
+                node.error(`Missing hub configuration. Hub ID: ${node.hubId}`);
+                node.status({ fill: 'red', shape: 'ring', text: 'missing hub config' });
+                return false;
+            }
+
+            const hubNode = RED.nodes.getNode(node.hubId);
+            if (!hubNode) {
+                node.error(`Hub node not found for ID: ${node.hubId}. Ensure the Alexa IOT Hub node is deployed.`);
+                node.status({ fill: 'red', shape: 'ring', text: `no hub: ${node.hubId}` });
+                return false;
+            }
+            if (hubNode.type !== 'alexa-iot-hub') {
+                node.error(`Invalid hub type for ID ${node.hubId}: expected alexa-iot-hub, got ${hubNode.type}`);
+                node.status({ fill: 'red', shape: 'ring', text: `invalid hub: ${hubNode.type}` });
+                return false;
+            }
+
+            node.status({ fill: 'green', shape: 'dot', text: 'linked to hub' });
+            return true;
+        }
+
+        // Validate hub on initialization
+        if (!name) {
+            node.error(`Missing name configuration. Name: ${name}`);
+            node.status({ fill: 'red', shape: 'ring', text: 'missing name' });
+            return;
+        }
+        validateHub();
 
         node.on('input', (msg, send, done) => {
             try {
+                // Revalidate hub on each input
+                if (!validateHub()) {
+                    done();
+                    return;
+                }
+
                 const { payload, topic: inputTopic } = msg;
                 let output = { topic: inputTopic, payload: msg.payload };
 
