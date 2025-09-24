@@ -28,25 +28,33 @@ module.exports = function(RED) {
             message: 'Too many requests, please try again later.'
         }));
 
-        // SSDP Configuration (Emulate Philips Hue bridge)
+        // SSDP Configuration (Enhanced Hue Emulation)
         const localIp = require('ip').address();
         const ssdp = new SSDPServer({
             location: `http://${localIp}:${port}/description.xml`,
             udn: `uuid:2f402f80-da50-11e1-9b23-${node.id}`,
             sourcePort: 1900,
-            adInterval: 10000
+            adInterval: 10000,
+            customHeaders: {
+                'hue-bridgeid': node.id.toUpperCase(),
+                'BRIDGEID': node.id.toUpperCase()
+            }
         });
 
         ssdp.addUSN('upnp:rootdevice');
         ssdp.addUSN('urn:schemas-upnp-org:device:basic:1');
-        ssdp.addUSN('urn:philips-hue:device:bridge:1'); // Emulate Hue bridge
+        ssdp.addUSN('urn:philips-hue:device:bridge:1');
+        ssdp.addUSN('ssdp:all'); // Broad compatibility
 
-        // Respond to SSDP M-SEARCH with Hue-like headers
         ssdp.on('response', (headers, statusCode, rinfo) => {
             node.debug(`SSDP response sent to ${rinfo.address}: ${JSON.stringify(headers)}`);
         });
 
-        // Serve description.xml for Hue emulation
+        ssdp.on('advertise-alive', (headers) => {
+            node.debug(`SSDP advertise-alive: ${JSON.stringify(headers)}`);
+        });
+
+        // Serve description.xml (Hue-like)
         app.get('/description.xml', (req, res) => {
             res.set('Content-Type', 'text/xml');
             res.send(`
@@ -58,11 +66,24 @@ module.exports = function(RED) {
                     </specVersion>
                     <URLBase>http://${localIp}:${port}/</URLBase>
                     <device>
-                        <deviceType>urn:schemas-upnp-org:device:basic:1</deviceType>
+                        <deviceType>urn:philips-hue:device:bridge:1</deviceType>
                         <friendlyName>Node-RED Alexa Hub (${node.id})</friendlyName>
                         <manufacturer>Node-RED</manufacturer>
-                        <modelName>Alexa IOT Hub</modelName>
+                        <manufacturerURL>https://nodered.org</manufacturerURL>
+                        <modelDescription>Node-RED Alexa IOT Hub</modelDescription>
+                        <modelName>Philips hue bridge 2015</modelName>
+                        <modelNumber>BSB002</modelNumber>
+                        <serialNumber>${node.id}</serialNumber>
                         <UDN>uuid:2f402f80-da50-11e1-9b23-${node.id}</UDN>
+                        <iconList>
+                            <icon>
+                                <mimetype>image/png</mimetype>
+                                <width>48</width>
+                                <height>48</height>
+                                <depth>24</depth>
+                                <url>/icon.png</url>
+                            </icon>
+                        </iconList>
                         <serviceList>
                             <service>
                                 <serviceType>urn:schemas-upnp-org:service:SmartHome:1</serviceType>
@@ -78,25 +99,15 @@ module.exports = function(RED) {
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Handle unexpected GET / requests
-        app.get('/', (req, res) => {
-            node.log(`Received GET / from ${req.ip}, responding with 404`);
-            res.status(404).json({ error: 'Not found, use POST /alexa for Alexa directives' });
+        // Log all requests
+        app.use((req, res, next) => {
+            node.log(`Request from ${req.ip}: ${req.method} ${req.url} Headers: ${JSON.stringify(req.headers)}`);
+            next();
         });
 
-        // Start SSDP server
-        try {
-            ssdp.start();
-            node.log(`SSDP server started, advertising on http://${localIp}:${port}/description.xml`);
-        } catch (err) {
-            node.error(`Failed to start SSDP server: ${err.message}`);
-            node.status({ fill: 'red', shape: 'ring', text: `ssdp error: ${err.message}` });
-        }
-
-        // Log all incoming requests
-        app.use('/alexa', (req, res, next) => {
-            node.log(`Request from ${req.ip}: ${req.method} ${req.url}`);
-            next();
+        // Handle unexpected GET /
+        app.get('/', (req, res) => {
+            res.status(404).json({ error: 'Not found, use POST /alexa for Alexa directives' });
         });
 
         app.post('/alexa', (req, res) => {
