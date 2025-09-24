@@ -38,52 +38,58 @@ module.exports = function(RED) {
         node.status({ fill: 'green', shape: 'dot', text: 'linked to hub' });
 
         node.on('input', (msg, send, done) => {
-    try {
-        const { payload, topic: inputTopic } = msg;
-        let output = { topic: inputTopic, payload: msg.payload };
+            try {
+                const { payload, topic: inputTopic } = msg;
+                let output = { topic: inputTopic, payload: msg.payload };
 
-        // Process payload based on incoming msg.topic
-        if (inputTopic === 'power') {
-            const state = payload === true || payload === 'ON' ? 'ON' : 'OFF';
-            RED.util.setMessageProperty(output, 'payload', state, true);
-        } else if (inputTopic === 'brightness') {
-            const brightness = Math.max(0, Math.min(100, Number(payload)));
-            RED.util.setMessageProperty(output, 'payload', brightness, true);
-        } else if (inputTopic === 'color') {
-            RED.util.setMessageProperty(output, 'payload', payload, true);
-        } else if (!node.topic) {
-            node.warn(`Unsupported topic: ${inputTopic}`);
-            done();
-            return;
-        }
+                // Process payload based on incoming msg.topic
+                if (inputTopic === 'power') {
+                    const state = payload === true || payload === 'ON' ? 'ON' : 'OFF';
+                    RED.util.setMessageProperty(output, 'payload', state, true);
+                } else if (inputTopic === 'brightness') {
+                    const brightness = Math.max(0, Math.min(100, Number(payload)));
+                    RED.util.setMessageProperty(output, 'payload', brightness, true);
+                } else if (inputTopic === 'color') {
+                    RED.util.setMessageProperty(output, 'payload', payload, true);
+                } else if (!node.topic) {
+                    node.warn(`Unsupported topic: ${inputTopic}`);
+                    done();
+                    return;
+                }
 
-        // Override output topic with custom topic if set
-        output.topic = node.topic || inputTopic;
+                // Override output topic with custom topic if set
+                output.topic = node.topic || inputTopic;
 
-        if (node.topic) {
-            node.debug(`Using custom topic: ${node.topic}`);
-        }
+                // Add device name to output message
+                output.device = node.name;
 
-        send(output);
+                // Update node status with trigger timestamp
+                node.status({ fill: 'green', shape: 'dot', text: new Date().toLocaleString() });
 
-        // Forward to target node if conditions met
-        if (output && output.payload !== null && targetNode) {
-            const target = RED.nodes.getNode(targetNode);
-            if (target) {
-                target.receive(output);
-                node.debug(`Forwarded message to target node: ${target.name || target.id}`);
-            } else {
-                node.warn(`Target node not found: ${targetNode}`);
+                if (node.topic) {
+                    node.debug(`Using custom topic: ${node.topic}`);
+                }
+
+                send(output);
+
+                // Forward to target node if conditions met
+                if (output && output.payload !== null && targetNode) {
+                    const target = RED.nodes.getNode(targetNode);
+                    if (target) {
+                        target.receive(output);
+                        node.debug(`Forwarded message to target node: ${target.name || target.id}`);
+                    } else {
+                        node.warn(`Target node not found: ${targetNode}`);
+                    }
+                }
+
+                done();
+            } catch (err) {
+                node.error(`Error processing input: ${err.message}`, msg);
+                node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
+                done(err);
             }
-        }
-
-        done();
-    } catch (err) {
-        node.error(`Error processing input: ${err.message}`, msg);
-        node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
-        done(err);
-    }
-});
+        });
 
         node.on('close', () => {
             node.status({});
