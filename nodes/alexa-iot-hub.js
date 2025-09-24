@@ -28,7 +28,7 @@ module.exports = function(RED) {
             message: 'Too many requests, please try again later.'
         }));
 
-        // SSDP Configuration (Enhanced Hue Emulation)
+        // SSDP Configuration (Hue Emulation)
         const localIp = require('ip').address();
         const ssdp = new SSDPServer({
             location: `http://${localIp}:${port}/description.xml`,
@@ -44,7 +44,7 @@ module.exports = function(RED) {
         ssdp.addUSN('upnp:rootdevice');
         ssdp.addUSN('urn:schemas-upnp-org:device:basic:1');
         ssdp.addUSN('urn:philips-hue:device:bridge:1');
-        ssdp.addUSN('ssdp:all'); // Broad compatibility
+        ssdp.addUSN('ssdp:all');
 
         ssdp.on('response', (headers, statusCode, rinfo) => {
             node.debug(`SSDP response sent to ${rinfo.address}: ${JSON.stringify(headers)}`);
@@ -97,6 +97,68 @@ module.exports = function(RED) {
                 </root>
             `);
             node.log(`Served description.xml to ${req.ip}`);
+        });
+
+        // Handle Hue API discovery
+        app.get('/api/:userId/lights', (req, res) => {
+            const userId = req.params.userId;
+            node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
+            const lights = {};
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    lights[n.endpointId || n.id] = {
+                        state: {
+                            on: false,
+                            bri: 100,
+                            hue: 0,
+                            sat: 0,
+                            reachable: true
+                        },
+                        type: 'Extended color light',
+                        name: n.name,
+                        modelid: 'LCT001',
+                        manufacturername: 'Node-RED',
+                        uniqueid: n.endpointId || n.id
+                    };
+                }
+            });
+
+            res.json(lights);
+            node.log(`Hue API lights response: ${JSON.stringify(lights)}`);
+        });
+
+        // Handle Hue API single light probe
+        app.get('/api/:userId/lights/:deviceId', (req, res) => {
+            const userId = req.params.userId;
+            const deviceId = req.params.deviceId;
+            node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
+            let light = null;
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && (n.endpointId || n.id) === deviceId && RED.nodes.getNode(n.hub) === node) {
+                    light = {
+                        state: {
+                            on: false,
+                            bri: 100,
+                            hue: 0,
+                            sat: 0,
+                            reachable: true
+                        },
+                        type: 'Extended color light',
+                        name: n.name,
+                        modelid: 'LCT001',
+                        manufacturername: 'Node-RED',
+                        uniqueid: n.endpointId || n.id
+                    };
+                }
+            });
+
+            if (light) {
+                res.json(light);
+                node.log(`Hue API light response: ${JSON.stringify(light)}`);
+            } else {
+                res.status(404).json({ error: `Device ${deviceId} not found` });
+                node.log(`Hue API light not found: ${deviceId}`);
+            }
         });
 
         // Log all requests
