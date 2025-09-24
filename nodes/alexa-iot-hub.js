@@ -54,7 +54,7 @@ module.exports = function(RED) {
             node.debug(`SSDP advertise-alive: ${JSON.stringify(headers)}`);
         });
 
-        // Serve description.xml (Hue-like)
+        // Serve UPnP description.xml
         app.get('/description.xml', (req, res) => {
             res.set('Content-Type', 'text/xml');
             res.send(`
@@ -99,14 +99,14 @@ module.exports = function(RED) {
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Handle Hue API discovery
-        app.get('/api/:userId/lights', (req, res) => {
-            const userId = req.params.userId;
-            node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
+        // Serve Hue-like device list at /api/description.xml
+        app.get('/api/description.xml', (req, res) => {
+            node.log(`Hue API description request from ${req.ip}`);
             const lights = {};
+            let index = 1;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    lights[n.endpointId || n.id] = {
+                    lights[index] = {
                         state: {
                             on: false,
                             bri: 100,
@@ -120,6 +120,48 @@ module.exports = function(RED) {
                         manufacturername: 'Node-RED',
                         uniqueid: n.endpointId || n.id
                     };
+                    index++;
+                }
+            });
+            res.json(lights);
+            node.log(`Hue API description response: ${JSON.stringify(lights)}`);
+        });
+
+        // Handle Hue API user creation
+        app.post('/api', (req, res) => {
+            node.log(`Hue API user creation request from ${req.ip}`);
+            res.json([{
+                success: {
+                    username: 'node-red-alexa-' + node.id,
+                    clientkey: 'node-red-alexa-' + node.id
+                }
+            }]);
+            node.log(`Hue API user created: node-red-alexa-${node.id}`);
+        });
+
+        // Handle Hue API discovery
+        app.get('/api/:userId/lights', (req, res) => {
+            const userId = req.params.userId;
+            node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
+            const lights = {};
+            let index = 1;
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    lights[index] = {
+                        state: {
+                            on: false,
+                            bri: 100,
+                            hue: 0,
+                            sat: 0,
+                            reachable: true
+                        },
+                        type: 'Extended color light',
+                        name: n.name,
+                        modelid: 'LCT001',
+                        manufacturername: 'Node-RED',
+                        uniqueid: n.endpointId || n.id
+                    };
+                    index++;
                 }
             });
 
@@ -133,22 +175,27 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
             let light = null;
+            let foundIndex = null;
             RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && (n.endpointId || n.id) === deviceId && RED.nodes.getNode(n.hub) === node) {
-                    light = {
-                        state: {
-                            on: false,
-                            bri: 100,
-                            hue: 0,
-                            sat: 0,
-                            reachable: true
-                        },
-                        type: 'Extended color light',
-                        name: n.name,
-                        modelid: 'LCT001',
-                        manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id
-                    };
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    const id = n.endpointId || n.id;
+                    if (deviceId === id || deviceId === String(Object.keys(lights).find(key => lights[key].uniqueid === id))) {
+                        light = {
+                            state: {
+                                on: false,
+                                bri: 100,
+                                hue: 0,
+                                sat: 0,
+                                reachable: true
+                            },
+                            type: 'Extended color light',
+                            name: n.name,
+                            modelid: 'LCT001',
+                            manufacturername: 'Node-RED',
+                            uniqueid: id
+                        };
+                        foundIndex = Object.keys(lights).find(key => lights[key].uniqueid === id) || deviceId;
+                    }
                 }
             });
 
@@ -158,6 +205,50 @@ module.exports = function(RED) {
             } else {
                 res.status(404).json({ error: `Device ${deviceId} not found` });
                 node.log(`Hue API light not found: ${deviceId}`);
+            }
+        });
+
+        // Handle Hue API control
+        app.put('/api/:userId/lights/:deviceId/state', (req, res) => {
+            const userId = req.params.userId;
+            const deviceId = req.params.deviceId;
+            const body = req.body;
+            node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
+            let deviceNode = null;
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    const id = n.endpointId || n.id;
+                    if (deviceId === id || deviceId === String(Object.keys(lights).find(key => lights[key].uniqueid === id))) {
+                        deviceNode = RED.nodes.getNode(n.id);
+                    }
+                }
+            });
+
+            if (!deviceNode) {
+                res.status(404).json([{ error: { type: 3, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
+                node.log(`Hue API control failed: Device ${deviceId} not found`);
+                return;
+            }
+
+            let topic, payload;
+            if (body.on !== undefined) {
+                topic = 'power';
+                payload = body.on ? 'ON' : 'OFF';
+            } else if (body.bri !== undefined) {
+                topic = 'brightness';
+                payload = Math.round((body.bri / 254) * 100); // Hue bri: 0-254, Alexa: 0-100
+            } else if (body.hue !== undefined && body.sat !== undefined) {
+                topic = 'color';
+                payload = { hue: body.hue, saturation: body.sat / 254, brightness: (body.bri || 100) / 254 };
+            }
+
+            if (topic && payload) {
+                deviceNode.receive({ topic, payload });
+                res.json([{ success: { [`/lights/${deviceId}/state/${topic}`]: payload } }]);
+                node.log(`Hue API control success: topic=${topic}, payload=${JSON.stringify(payload)}`);
+            } else {
+                res.status(400).json([{ error: { type: 6, address: `/lights/${deviceId}/state`, description: 'Invalid or missing parameters' } }]);
+                node.log(`Hue API control failed: Invalid or missing parameters`);
             }
         });
 
@@ -198,10 +289,13 @@ module.exports = function(RED) {
 
                 if (namespace === 'Alexa.Discovery' && name === 'Discover') {
                     const devices = [];
+                    const lights = {};
+                    let index = 1;
                     RED.nodes.eachNode(n => {
                         if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                            const id = n.endpointId || n.id;
                             devices.push({
-                                endpointId: n.endpointId || n.id,
+                                endpointId: id,
                                 friendlyName: n.name,
                                 description: `Node-RED ${n.name}`,
                                 manufacturerName: 'Node-RED',
@@ -244,6 +338,21 @@ module.exports = function(RED) {
                                     }
                                 ]
                             });
+                            lights[index] = {
+                                state: {
+                                    on: false,
+                                    bri: 100,
+                                    hue: 0,
+                                    sat: 0,
+                                    reachable: true
+                                },
+                                type: 'Extended color light',
+                                name: n.name,
+                                modelid: 'LCT001',
+                                manufacturername: 'Node-RED',
+                                uniqueid: id
+                            };
+                            index++;
                         }
                     });
 
