@@ -10,7 +10,7 @@ module.exports = function(RED) {
     function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const { name, hub, targetNode, topic } = config; // Added topic
+        const { name, hub, targetNode, topic } = config;
 
         // Validate configuration
         if (!name || !hub) {
@@ -21,7 +21,7 @@ module.exports = function(RED) {
 
         const hubNode = RED.nodes.getNode(hub);
         if (!hubNode) {
-            node.error(`Hub node not found for ID: ${hub}. Ensure the Alexa IOT Hub node is deployed and correctly configured.`);
+            node.error(`Hub node not found for ID: ${hub}. Ensure the Alexa IOT Hub node is deployed.`);
             node.status({ fill: 'red', shape: 'ring', text: `no hub: ${hub}` });
             return;
         }
@@ -35,53 +35,55 @@ module.exports = function(RED) {
         node.topic = topic;
 
         // Set initial status
-        node.status({ fill: 'green', shape: 'dot', text: 'connected to hub' });
+        node.status({ fill: 'green', shape: 'dot', text: 'linked to hub' });
 
         node.on('input', (msg, send, done) => {
-            try {
-                const { payload } = msg;
-                // Use custom topic if defined, else fall back to incoming msg.topic
-                const outputTopic = node.topic || msg.topic;
-                let output = { topic: outputTopic, payload: msg.payload };
+    try {
+        const { payload, topic: inputTopic } = msg;
+        let output = { topic: inputTopic, payload: msg.payload };
 
-                if (outputTopic === 'power' || (!node.topic && msg.topic === 'power')) {
-                    const state = payload === true || payload === 'ON' ? 'ON' : 'OFF';
-                    RED.util.setMessageProperty(output, 'payload', state, true);
-                } else if (outputTopic === 'brightness' || (!node.topic && msg.topic === 'brightness')) {
-                    const brightness = Math.max(0, Math.min(100, Number(payload)));
-                    RED.util.setMessageProperty(output, 'payload', brightness, true);
-                } else if (outputTopic === 'color' || (!node.topic && msg.topic === 'color')) {
-                    RED.util.setMessageProperty(output, 'payload', payload, true);
-                } else {
-                    node.warn(`Unsupported topic: ${outputTopic}`);
-                    done();
-                    return;
-                }
+        // Process payload based on incoming msg.topic
+        if (inputTopic === 'power') {
+            const state = payload === true || payload === 'ON' ? 'ON' : 'OFF';
+            RED.util.setMessageProperty(output, 'payload', state, true);
+        } else if (inputTopic === 'brightness') {
+            const brightness = Math.max(0, Math.min(100, Number(payload)));
+            RED.util.setMessageProperty(output, 'payload', brightness, true);
+        } else if (inputTopic === 'color') {
+            RED.util.setMessageProperty(output, 'payload', payload, true);
+        } else if (!node.topic) {
+            node.warn(`Unsupported topic: ${inputTopic}`);
+            done();
+            return;
+        }
 
-                if (node.topic) {
-                    node.debug(`Using custom topic: ${node.topic}`);
-                }
+        // Override output topic with custom topic if set
+        output.topic = node.topic || inputTopic;
 
-                send(output);
+        if (node.topic) {
+            node.debug(`Using custom topic: ${node.topic}`);
+        }
 
-                // Forward to target node if conditions met
-                if (output && output.payload !== null && targetNode) {
-                    const target = RED.nodes.getNode(targetNode);
-                    if (target) {
-                        target.receive(output);
-                        node.debug(`Forwarded message to target node: ${target.name || target.id}`);
-                    } else {
-                        node.warn(`Target node not found: ${targetNode}`);
-                    }
-                }
+        send(output);
 
-                done();
-            } catch (err) {
-                node.error(`Error processing input: ${err.message}`, msg);
-                node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
-                done(err);
+        // Forward to target node if conditions met
+        if (output && output.payload !== null && targetNode) {
+            const target = RED.nodes.getNode(targetNode);
+            if (target) {
+                target.receive(output);
+                node.debug(`Forwarded message to target node: ${target.name || target.id}`);
+            } else {
+                node.warn(`Target node not found: ${targetNode}`);
             }
-        });
+        }
+
+        done();
+    } catch (err) {
+        node.error(`Error processing input: ${err.message}`, msg);
+        node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
+        done(err);
+    }
+});
 
         node.on('close', () => {
             node.status({});
