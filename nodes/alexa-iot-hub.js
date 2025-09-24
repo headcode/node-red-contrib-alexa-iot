@@ -28,31 +28,69 @@ module.exports = function(RED) {
             message: 'Too many requests, please try again later.'
         }));
 
-        // SSDP Configuration
+        // SSDP Configuration (Emulate Philips Hue bridge)
+        const localIp = require('ip').address();
         const ssdp = new SSDPServer({
-            location: `http://${require('ip').address()}:${port}/alexa`,
-            udn: `uuid:${node.id}`,
+            location: `http://${localIp}:${port}/description.xml`,
+            udn: `uuid:2f402f80-da50-11e1-9b23-${node.id}`,
             sourcePort: 1900,
             adInterval: 10000
         });
 
         ssdp.addUSN('upnp:rootdevice');
-        ssdp.addUSN('urn:schemas-upnp-org:device:SmartHomeHub:1');
+        ssdp.addUSN('urn:schemas-upnp-org:device:basic:1');
+        ssdp.addUSN('urn:philips-hue:device:bridge:1'); // Emulate Hue bridge
 
-        ssdp.on('advertise-alive', (headers) => {
-            node.debug('SSDP advertise-alive: ' + JSON.stringify(headers));
+        // Respond to SSDP M-SEARCH with Hue-like headers
+        ssdp.on('response', (headers, statusCode, rinfo) => {
+            node.debug(`SSDP response sent to ${rinfo.address}: ${JSON.stringify(headers)}`);
         });
 
-        ssdp.on('advertise-bye', (headers) => {
-            node.debug('SSDP advertise-bye: ' + JSON.stringify(headers));
+        // Serve description.xml for Hue emulation
+        app.get('/description.xml', (req, res) => {
+            res.set('Content-Type', 'text/xml');
+            res.send(`
+                <?xml version="1.0"?>
+                <root xmlns="urn:schemas-upnp-org:device-1-0">
+                    <specVersion>
+                        <major>1</major>
+                        <minor>0</minor>
+                    </specVersion>
+                    <URLBase>http://${localIp}:${port}/</URLBase>
+                    <device>
+                        <deviceType>urn:schemas-upnp-org:device:basic:1</deviceType>
+                        <friendlyName>Node-RED Alexa Hub (${node.id})</friendlyName>
+                        <manufacturer>Node-RED</manufacturer>
+                        <modelName>Alexa IOT Hub</modelName>
+                        <UDN>uuid:2f402f80-da50-11e1-9b23-${node.id}</UDN>
+                        <serviceList>
+                            <service>
+                                <serviceType>urn:schemas-upnp-org:service:SmartHome:1</serviceType>
+                                <serviceId>urn:upnp-org:serviceId:SmartHome1</serviceId>
+                                <controlURL>/alexa</controlURL>
+                                <eventSubURL>/alexa</eventSubURL>
+                                <SCPDURL>/alexa</SCPDURL>
+                            </service>
+                        </serviceList>
+                    </device>
+                </root>
+            `);
+            node.log(`Served description.xml to ${req.ip}`);
+        });
+
+        // Handle unexpected GET / requests
+        app.get('/', (req, res) => {
+            node.log(`Received GET / from ${req.ip}, responding with 404`);
+            res.status(404).json({ error: 'Not found, use POST /alexa for Alexa directives' });
         });
 
         // Start SSDP server
         try {
             ssdp.start();
-            node.log(`SSDP server started, advertising on http://${require('ip').address()}:${port}/alexa`);
+            node.log(`SSDP server started, advertising on http://${localIp}:${port}/description.xml`);
         } catch (err) {
             node.error(`Failed to start SSDP server: ${err.message}`);
+            node.status({ fill: 'red', shape: 'ring', text: `ssdp error: ${err.message}` });
         }
 
         // Log all incoming requests
