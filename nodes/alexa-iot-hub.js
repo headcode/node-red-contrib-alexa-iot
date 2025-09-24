@@ -3,7 +3,6 @@
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const bodyParser = require('body-parser');
 const sanitizeHtml = require('sanitize-html');
 
 module.exports = function(RED) {
@@ -25,17 +24,23 @@ module.exports = function(RED) {
                 max: 100,
                 message: 'Too many requests, please try again later.'
             }));
-            app.use(bodyParser.json());
+            app.use(express.json());
 
-            // Custom Alexa Smart Home endpoint for Echo device discovery and control
+            // Log all incoming requests for debugging
+            app.use('/alexa', (req, res, next) => {
+                node.log(`Incoming request to /alexa from IP ${req.ip}: Method=${req.method}, Body=${JSON.stringify(req.body, null, 2)}`);
+                next();
+            });
+
+            // Custom Alexa endpoint for Echo device discovery and control
             app.post('/alexa', async (req, res) => {
                 if (debug) {
-                    node.log(`Received Alexa request: ${JSON.stringify(req.body, null, 2)}`);
+                    node.log(`Processing Alexa request from IP ${req.ip}: ${JSON.stringify(req.body, null, 2)}`);
                 }
 
                 const { directive } = req.body;
                 if (!directive) {
-                    return res.status(400).json({
+                    const errorResponse = {
                         event: {
                             header: {
                                 namespace: 'Alexa',
@@ -48,7 +53,11 @@ module.exports = function(RED) {
                                 message: 'Missing or invalid directive'
                             }
                         }
-                    });
+                    };
+                    if (debug) {
+                        node.log(`Error response: ${JSON.stringify(errorResponse, null, 2)}`);
+                    }
+                    return res.status(400).json(errorResponse);
                 }
 
                 const { header, endpoint, payload } = directive;
@@ -117,7 +126,7 @@ module.exports = function(RED) {
 
                 // Handle Control Directives
                 if (!endpointId) {
-                    return res.status(400).json({
+                    const errorResponse = {
                         event: {
                             header: {
                                 namespace: 'Alexa',
@@ -131,12 +140,16 @@ module.exports = function(RED) {
                                 message: `Device ${endpointId} not found`
                             }
                         }
-                    });
+                    };
+                    if (debug) {
+                        node.log(`Error response: ${JSON.stringify(errorResponse, null, 2)}`);
+                    }
+                    return res.status(400).json(errorResponse);
                 }
 
                 const deviceNode = RED.nodes.getNode(endpointId);
                 if (!deviceNode) {
-                    return res.status(404).json({
+                    const errorResponse = {
                         event: {
                             header: {
                                 namespace: 'Alexa',
@@ -150,7 +163,11 @@ module.exports = function(RED) {
                                 message: `Device ${endpointId} not found`
                             }
                         }
-                    });
+                    };
+                    if (debug) {
+                        node.log(`Error response: ${JSON.stringify(errorResponse, null, 2)}`);
+                    }
+                    return res.status(404).json(errorResponse);
                 }
 
                 const msg = { topic: '', payload: null };
@@ -173,7 +190,7 @@ module.exports = function(RED) {
                     msg.payload = payload.color;
                     responseProperty = { namespace: 'Alexa.ColorController', name: 'color', value: payload.color };
                 } else {
-                    return res.status(400).json({
+                    const errorResponse = {
                         event: {
                             header: {
                                 namespace: 'Alexa',
@@ -187,7 +204,11 @@ module.exports = function(RED) {
                                 message: `Unsupported directive: ${namespace}.${name}`
                             }
                         }
-                    });
+                    };
+                    if (debug) {
+                        node.log(`Error response: ${JSON.stringify(errorResponse, null, 2)}`);
+                    }
+                    return res.status(400).json(errorResponse);
                 }
 
                 deviceNode.receive(msg);
