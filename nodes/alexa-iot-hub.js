@@ -99,33 +99,123 @@ module.exports = function(RED) {
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Serve Hue-like device list at /api/description.xml
-        app.get('/api/description.xml', (req, res) => {
-            node.log(`Hue API description request from ${req.ip}`);
+        // Helper function to generate device list
+        function generateDeviceList() {
             const lights = {};
             let index = 1;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    lights[index] = {
+                    const uniqueid = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
+                    lights[uniqueid] = {
                         state: {
                             on: false,
-                            bri: 100,
+                            bri: 254,
                             hue: 0,
-                            sat: 0,
+                            sat: 254,
+                            effect: 'none',
+                            xy: [0, 0],
+                            ct: 199,
+                            alert: 'none',
+                            colormode: 'ct',
+                            mode: 'homeautomation',
                             reachable: true
+                        },
+                        swupdate: {
+                            state: 'noupdates',
+                            lastinstall: new Date().toISOString()
                         },
                         type: 'Extended color light',
                         name: n.name,
-                        modelid: 'LCT001',
-                        manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id,
-                        swversion: '1.0.0'
+                        modelid: 'LCT007',
+                        manufacturername: 'Philips',
+                        productname: 'Hue color lamp',
+                        capabilities: {
+                            certified: true,
+                            control: {
+                                mindimlevel: 5000,
+                                maxlumen: 600,
+                                colorgamuttype: 'A',
+                                colorgamut: [[0.675, 0.322], [0.409, 0.518], [0.167, 0.04]],
+                                ct: { min: 153, max: 500 }
+                            },
+                            streaming: { renderer: true, proxy: false }
+                        },
+                        config: {
+                            archetype: 'sultanbulb',
+                            function: 'mixed',
+                            direction: 'omnidirectional'
+                        },
+                        uniqueid: uniqueid,
+                        swversion: '5.105.0.21169'
                     };
                     index++;
                 }
             });
-            res.json(lights);
-            node.log(`Hue API description response: ${JSON.stringify(lights)}`);
+            return lights;
+        }
+
+        // Serve Hue-like device list at /api/description.xml
+        app.get('/api/description.xml', (req, res) => {
+            node.log(`Hue API description request from ${req.ip}`);
+            const lights = generateDeviceList();
+            const response = {
+                lights: lights,
+                groups: {},
+                config: {
+                    name: 'Philips hue',
+                    zigbeechannel: 25,
+                    bridgeid: node.id.toUpperCase(),
+                    mac: '00:00:00:aa:bb:cc',
+                    dhcp: true,
+                    ipaddress: localIp,
+                    netmask: '0.0.0.0',
+                    gateway: '0.0.0.0',
+                    proxyaddress: 'none',
+                    proxyport: 0,
+                    UTC: new Date().toISOString(),
+                    modelid: 'BSB001',
+                    datastoreversion: '59',
+                    swversion: '01043155',
+                    apiversion: '1.16.0',
+                    swupdate: {
+                        updatestate: 0,
+                        checkforupdate: false,
+                        devicetypes: { bridge: false, lights: [], sensors: [] },
+                        url: '',
+                        text: '',
+                        notify: true
+                    },
+                    linkbutton: false,
+                    portalservices: false,
+                    portalconnection: 'disconnected',
+                    portalstate: {
+                        signedon: false,
+                        incoming: false,
+                        outgoing: false,
+                        communication: 'disconnected'
+                    },
+                    factorynew: false,
+                    replacesbridgeid: null,
+                    backup: { status: 'idle', errorcode: 0 },
+                    whitelist: {
+                        'description.xml': {
+                            'last use date': new Date().toISOString(),
+                            'create date': new Date().toISOString(),
+                            name: 'Echo'
+                        }
+                    }
+                },
+                swupdate2: {
+                    checkforupdate: false,
+                    lastchange: new Date().toISOString(),
+                    bridge: { state: 'noupdates', lastinstall: new Date().toISOString() },
+                    state: 'noupdates',
+                    autoinstall: { updatetime: 'T14:00:00', on: false }
+                },
+                schedules: {}
+            };
+            res.json(response);
+            node.log(`Hue API description response: ${JSON.stringify(response, null, 2)}`);
         });
 
         // Handle Hue API user creation
@@ -140,35 +230,128 @@ module.exports = function(RED) {
             node.log(`Hue API user created: node-red-alexa-${node.id}`);
         });
 
+        // Handle Hue API full config
+        app.get('/api/:userId', (req, res) => {
+            const userId = req.params.userId;
+            node.log(`Hue API full config request from ${req.ip} for user ${userId}`);
+            const lights = generateDeviceList();
+            const response = {
+                lights: lights,
+                groups: {},
+                config: {
+                    name: 'Philips hue',
+                    zigbeechannel: 25,
+                    bridgeid: node.id.toUpperCase(),
+                    mac: '00:00:00:aa:bb:cc',
+                    dhcp: true,
+                    ipaddress: localIp,
+                    netmask: '0.0.0.0',
+                    gateway: '0.0.0.0',
+                    proxyaddress: 'none',
+                    proxyport: 0,
+                    UTC: new Date().toISOString(),
+                    modelid: 'BSB001',
+                    datastoreversion: '59',
+                    swversion: '01043155',
+                    apiversion: '1.16.0',
+                    swupdate: {
+                        updatestate: 0,
+                        checkforupdate: false,
+                        devicetypes: { bridge: false, lights: [], sensors: [] },
+                        url: '',
+                        text: '',
+                        notify: true
+                    },
+                    linkbutton: false,
+                    portalservices: false,
+                    portalconnection: 'disconnected',
+                    portalstate: {
+                        signedon: false,
+                        incoming: false,
+                        outgoing: false,
+                        communication: 'disconnected'
+                    },
+                    factorynew: false,
+                    replacesbridgeid: null,
+                    backup: { status: 'idle', errorcode: 0 },
+                    whitelist: {
+                        [userId]: {
+                            'last use date': new Date().toISOString(),
+                            'create date': new Date().toISOString(),
+                            name: 'Echo'
+                        }
+                    }
+                },
+                swupdate2: {
+                    checkforupdate: false,
+                    lastchange: new Date().toISOString(),
+                    bridge: { state: 'noupdates', lastinstall: new Date().toISOString() },
+                    state: 'noupdates',
+                    autoinstall: { updatetime: 'T14:00:00', on: false }
+                },
+                schedules: {}
+            };
+            res.json(response);
+            node.log(`Hue API full config response: ${JSON.stringify(response, null, 2)}`);
+        });
+
+        // Handle Hue API config
+        app.get('/api/config', (req, res) => {
+            node.log(`Hue API config request from ${req.ip}`);
+            res.json({
+                name: 'Philips hue',
+                zigbeechannel: 25,
+                bridgeid: node.id.toUpperCase(),
+                mac: '00:00:00:aa:bb:cc',
+                dhcp: true,
+                ipaddress: localIp,
+                netmask: '0.0.0.0',
+                gateway: '0.0.0.0',
+                proxyaddress: 'none',
+                proxyport: 0,
+                UTC: new Date().toISOString(),
+                modelid: 'BSB001',
+                datastoreversion: '59',
+                swversion: '01043155',
+                apiversion: '1.16.0',
+                swupdate: {
+                    updatestate: 0,
+                    checkforupdate: false,
+                    devicetypes: { bridge: false, lights: [], sensors: [] },
+                    url: '',
+                    text: '',
+                    notify: true
+                },
+                linkbutton: false,
+                portalservices: false,
+                portalconnection: 'disconnected',
+                portalstate: {
+                    signedon: false,
+                    incoming: false,
+                    outgoing: false,
+                    communication: 'disconnected'
+                },
+                factorynew: false,
+                replacesbridgeid: null,
+                backup: { status: 'idle', errorcode: 0 },
+                whitelist: {
+                    'description.xml': {
+                        'last use date': new Date().toISOString(),
+                        'create date': new Date().toISOString(),
+                        name: 'Echo'
+                    }
+                }
+            });
+            node.log(`Hue API config response sent`);
+        });
+
         // Handle Hue API discovery
         app.get('/api/:userId/lights', (req, res) => {
             const userId = req.params.userId;
             node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
-            const lights = {};
-            let index = 1;
-            RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    lights[index] = {
-                        state: {
-                            on: false,
-                            bri: 100,
-                            hue: 0,
-                            sat: 0,
-                            reachable: true
-                        },
-                        type: 'Extended color light',
-                        name: n.name,
-                        modelid: 'LCT001',
-                        manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id,
-                        swversion: '1.0.0'
-                    };
-                    index++;
-                }
-            });
-
+            const lights = generateDeviceList();
             res.json(lights);
-            node.log(`Hue API lights response: ${JSON.stringify(lights)}`);
+            node.log(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
         });
 
         // Handle Hue API single light probe
@@ -176,56 +359,23 @@ module.exports = function(RED) {
             const userId = req.params.userId;
             const deviceId = req.params.deviceId;
             node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
-            const lights = {};
-            let index = 1;
-            RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    lights[index] = {
-                        state: {
-                            on: false,
-                            bri: 100,
-                            hue: 0,
-                            sat: 0,
-                            reachable: true
-                        },
-                        type: 'Extended color light',
-                        name: n.name,
-                        modelid: 'LCT001',
-                        manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id,
-                        swversion: '1.0.0'
-                    };
-                    index++;
-                }
-            });
+            const lights = generateDeviceList();
+            let light = lights[deviceId];
 
-            let light = null;
-            RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const id = n.endpointId || n.id;
-                    if (deviceId === id || deviceId === String(Object.keys(lights).find(key => lights[key].uniqueid === id))) {
-                        light = {
-                            state: {
-                                on: false,
-                                bri: 100,
-                                hue: 0,
-                                sat: 0,
-                                reachable: true
-                            },
-                            type: 'Extended color light',
-                            name: n.name,
-                            modelid: 'LCT001',
-                            manufacturername: 'Node-RED',
-                            uniqueid: id,
-                            swversion: '1.0.0'
-                        };
+            if (!light) {
+                RED.nodes.eachNode(n => {
+                    if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                        const id = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
+                        if (deviceId === id || deviceId === n.endpointId || deviceId === n.id) {
+                            light = lights[id];
+                        }
                     }
-                }
-            });
+                });
+            }
 
             if (light) {
                 res.json(light);
-                node.log(`Hue API light response: ${JSON.stringify(light)}`);
+                node.log(`Hue API light response: ${JSON.stringify(light, null, 2)}`);
             } else {
                 res.status(404).json({ error: `Device ${deviceId} not found` });
                 node.log(`Hue API light not found: ${deviceId}`);
@@ -238,21 +388,16 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             const body = req.body;
             node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
-            const lights = {};
-            let index = 1;
-            RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    lights[index] = { uniqueid: n.endpointId || n.id };
-                    index++;
-                }
-            });
-
+            const lights = generateDeviceList();
             let deviceNode = null;
+            let matchedId = null;
+
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const id = n.endpointId || n.id;
-                    if (deviceId === id || deviceId === String(Object.keys(lights).find(key => lights[key].uniqueid === id))) {
+                    const id = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
+                    if (deviceId === id || deviceId === n.endpointId || deviceId === n.id) {
                         deviceNode = RED.nodes.getNode(n.id);
+                        matchedId = id;
                     }
                 }
             });
@@ -272,7 +417,13 @@ module.exports = function(RED) {
                 payload = Math.round((body.bri / 254) * 100); // Hue bri: 0-254, Alexa: 0-100
             } else if (body.hue !== undefined && body.sat !== undefined) {
                 topic = 'color';
-                payload = { hue: body.hue, saturation: body.sat / 254, brightness: (body.bri || 100) / 254 };
+                payload = { hue: body.hue, saturation: body.sat / 254, brightness: (body.bri || 254) / 254 };
+            } else if (body.xy) {
+                topic = 'color';
+                payload = { xy: body.xy, brightness: (body.bri || 254) / 254 };
+            } else if (body.ct) {
+                topic = 'color';
+                payload = { ct: body.ct, brightness: (body.bri || 254) / 254 };
             }
 
             if (topic && payload) {
@@ -384,7 +535,7 @@ module.exports = function(RED) {
                     });
 
                     if (debug) {
-                        node.log(`Discovery response: ${JSON.stringify(devices)}`);
+                        node.log(`Discovery response: ${JSON.stringify(devices, null, 2)}`);
                     }
                     return;
                 }
