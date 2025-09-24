@@ -35,7 +35,8 @@ module.exports = function(RED) {
             // Custom Alexa endpoint for Echo device discovery and control
             app.post('/alexa', async (req, res) => {
                 if (debug) {
-                    node.log(`Processing Alexa request from IP ${req.ip}: ${JSON.stringify(req.body, null, 2)}`);
+                    node.log(`Request from ${req.ip}: ${req.method} ${req.url} Headers: ${JSON.stringify(req.headers)}`);
+              //      node.log(`Processing Alexa request from IP ${req.ip}: ${JSON.stringify(req.body, null, 2)}`);
                 }
 
                 const { directive } = req.body;
@@ -277,3 +278,4 @@ module.exports = function(RED) {
         console.error(`Failed to register alexa-iot-hub node: ${err.message}`);
     }
 };
+
