@@ -1,7 +1,7 @@
 {
     "name": "node-red-contrib-alexa-iot",
     "version": "0.2.0",
-    "description": "Alexa controlled Node-RED nodes for Amazon Echo devices, no Alexa Skills or cloud dependencies required",
+    "description": "Create Node-RED device nodes to be controlled by Amazon Echo devices, no Alexa Skills or cloud dependencies required",
     "main": "nodes/alexa-iot-hub.js",
     "scripts": {
         "test": "mocha test/**/*_spec.js --exit"
@@ -45,7 +45,6 @@
         "express": "^5.1.0",
         "helmet": "^8.1.0",
         "express-rate-limit": "^8.1.0",
-        "node-red-contrib-alexa-smart-home": "^0.4.68",
         "sanitize-html": "^2.17.0"
     },
     "devDependencies": {
