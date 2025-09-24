@@ -20,9 +20,9 @@
         oneditprepare: function() {
             const node = this;
             document.getElementById('node-input-name').setAttribute('aria-label', 'Device name for Alexa');
-            document.getElementById('node-input-hub').setAttribute('aria-label', 'Enter Alexa IOT Hub ID');
-            document.getElementById('node-input-targetNode').setAttribute('aria-label', 'Enter target node ID');
-            document.getElementById('node-input-topic').setAttribute('aria-label', 'Enter custom message topic');
+            document.getElementById('node-input-hub').setAttribute('aria-label', 'Alexa IOT Hub ID (required)');
+            document.getElementById('node-input-targetNode').setAttribute('aria-label', 'Target node ID (optional)');
+            document.getElementById('node-input-topic').setAttribute('aria-label', 'Topic (optional)');
 
             document.getElementById('node-input-hub').value = node.hub || '';
             document.getElementById('node-input-targetNode').value = node.targetNode || '';
@@ -64,21 +64,21 @@
     </div>
     <div class="form-row">
         <label for="node-input-hub"><i class="fa fa-server"></i> Hub ID</label>
-        <input type="text" id="node-input-hub" placeholder="Enter Alexa IOT Hub ID" aria-label="Enter Alexa IOT Hub ID">
+        <input type="text" id="node-input-hub" placeholder="Alexa IOT Hub ID" aria-label="Alexa IOT Hub ID (required)">
     </div>
     <div class="form-row">
         <label for="node-input-targetNode"><i class="fa fa-share"></i> Target Node ID</label>
-        <input type="text" id="node-input-targetNode" placeholder="Enter target node ID" aria-label="Enter target node ID">
+        <input type="text" id="node-input-targetNode" placeholder="Target node ID (optional)" aria-label="Target node ID (optional)">
     </div>
     <div class="form-row">
         <label for="node-input-topic"><i class="fa fa-comment"></i> Topic</label>
-        <input type="text" id="node-input-topic" placeholder="Topic (optional)" aria-label="Enter message topic">
+        <input type="text" id="node-input-topic" placeholder="Topic (optional)" aria-label="Topic (optional)">
     </div>
 </script>
 
 <script type="text/html" data-help-name="alexa-iot-device">
     <h3>Alexa IOT Device</h3>
-    <p>This node receives commands (e.g., for power, brightness, or color) from an Alexa IOT Hub and forwards them to the output and optionally a user specified target node.</p>
+    <p>This node receives commands (e.g., for power, brightness, or color) from an Alexa IOT Hub and forwards them to the output, and optionally, a user specified target node.</p>
     <h4>Configuration</h4>
     <ul>
         <li><strong>Name</strong>: The device name as it will appear in Alexa (e.g. "Living Room Light"). Required.</li>
@@ -92,7 +92,7 @@
         <li><strong>Node Properties</strong>: Double-click a node in the editor. The ID is shown at the bottom of the configuration panel (e.g. "123abc45.678def"). Copy and paste it into the Hub ID or Target Node ID field.</li>
         <li><strong>Flow JSON</strong>: Click the menu (☰) > Export > Clipboard, select "all flows," and export. Open the JSON in a text editor and find the node’s <code>id</code> field (e.g. <code>"id": "123abc45.678def"</code>).</li>
     </ol>
-    <p><strong>Note</strong>: The Hub ID must correspond to an Alexa IOT Hub node, and the Target Node ID (if used) must correspond to a valid node. Invalid IDs or topics will prevent saving the configuration.</p>
+    <p><strong>Note</strong>: The Hub ID must correspond to an Alexa IOT Hub node. The Target Node ID (if used) must correspond to a valid node.</p>
 </script>
 
 <style>
