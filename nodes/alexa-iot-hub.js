@@ -118,7 +118,8 @@ module.exports = function(RED) {
                         name: n.name,
                         modelid: 'LCT001',
                         manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id
+                        uniqueid: n.endpointId || n.id,
+                        swversion: '1.0.0'
                     };
                     index++;
                 }
@@ -159,7 +160,8 @@ module.exports = function(RED) {
                         name: n.name,
                         modelid: 'LCT001',
                         manufacturername: 'Node-RED',
-                        uniqueid: n.endpointId || n.id
+                        uniqueid: n.endpointId || n.id,
+                        swversion: '1.0.0'
                     };
                     index++;
                 }
@@ -174,8 +176,30 @@ module.exports = function(RED) {
             const userId = req.params.userId;
             const deviceId = req.params.deviceId;
             node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
+            const lights = {};
+            let index = 1;
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    lights[index] = {
+                        state: {
+                            on: false,
+                            bri: 100,
+                            hue: 0,
+                            sat: 0,
+                            reachable: true
+                        },
+                        type: 'Extended color light',
+                        name: n.name,
+                        modelid: 'LCT001',
+                        manufacturername: 'Node-RED',
+                        uniqueid: n.endpointId || n.id,
+                        swversion: '1.0.0'
+                    };
+                    index++;
+                }
+            });
+
             let light = null;
-            let foundIndex = null;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
                     const id = n.endpointId || n.id;
@@ -192,9 +216,9 @@ module.exports = function(RED) {
                             name: n.name,
                             modelid: 'LCT001',
                             manufacturername: 'Node-RED',
-                            uniqueid: id
+                            uniqueid: id,
+                            swversion: '1.0.0'
                         };
-                        foundIndex = Object.keys(lights).find(key => lights[key].uniqueid === id) || deviceId;
                     }
                 }
             });
@@ -214,6 +238,15 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             const body = req.body;
             node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
+            const lights = {};
+            let index = 1;
+            RED.nodes.eachNode(n => {
+                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
+                    lights[index] = { uniqueid: n.endpointId || n.id };
+                    index++;
+                }
+            });
+
             let deviceNode = null;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
@@ -289,13 +322,10 @@ module.exports = function(RED) {
 
                 if (namespace === 'Alexa.Discovery' && name === 'Discover') {
                     const devices = [];
-                    const lights = {};
-                    let index = 1;
                     RED.nodes.eachNode(n => {
                         if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                            const id = n.endpointId || n.id;
                             devices.push({
-                                endpointId: id,
+                                endpointId: n.endpointId || n.id,
                                 friendlyName: n.name,
                                 description: `Node-RED ${n.name}`,
                                 manufacturerName: 'Node-RED',
@@ -338,21 +368,6 @@ module.exports = function(RED) {
                                     }
                                 ]
                             });
-                            lights[index] = {
-                                state: {
-                                    on: false,
-                                    bri: 100,
-                                    hue: 0,
-                                    sat: 0,
-                                    reachable: true
-                                },
-                                type: 'Extended color light',
-                                name: n.name,
-                                modelid: 'LCT001',
-                                manufacturername: 'Node-RED',
-                                uniqueid: id
-                            };
-                            index++;
                         }
                     });
 
