@@ -1,21 +1,38 @@
 'use strict';
 
 module.exports = function(RED) {
+    // Ensure RED is defined
+    if (!RED || !RED.nodes || !RED.nodes.registerType) {
+        console.error('Node-RED runtime (RED) is undefined. Cannot register alexa-iot-device node.');
+        return;
+    }
+
     function AlexaIOTDeviceNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
         const { name, hub, targetNode } = config;
 
+        // Validate configuration
         if (!name || !hub) {
-            node.error('Missing name or hub configuration');
+            node.error(`Missing name or hub configuration. Name: ${name}, Hub ID: ${hub}`);
+            node.status({ fill: 'red', shape: 'ring', text: 'missing config' });
             return;
         }
 
         const hubNode = RED.nodes.getNode(hub);
         if (!hubNode) {
-            node.error('Hub node not found');
+            node.error(`Hub node not found for ID: ${hub}. Ensure the Alexa IOT Hub node is deployed and correctly configured.`);
+            node.status({ fill: 'red', shape: 'ring', text: `no hub: ${hub}` });
             return;
         }
+        if (hubNode.type !== 'alexa-iot-hub') {
+            node.error(`Invalid hub type for ID ${hub}: expected alexa-iot-hub, got ${hubNode.type}`);
+            node.status({ fill: 'red', shape: 'ring', text: `invalid hub: ${hubNode.type}` });
+            return;
+        }
+
+        // Set initial status
+        node.status({ fill: 'green', shape: 'dot', text: 'connected to hub' });
 
         node.on('input', (msg, send, done) => {
             try {
@@ -52,12 +69,19 @@ module.exports = function(RED) {
                 done();
             } catch (err) {
                 node.error(`Error processing input: ${err.message}`, msg);
+                node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
                 done(err);
             }
         });
+
+        node.on('close', () => {
+            node.status({});
+        });
     }
-    RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
 
+    try {
+        RED.nodes.registerType('alexa-iot-device', AlexaIOTDeviceNode);
+    } catch (err) {
+        console.error(`Failed to register alexa-iot-device node: ${err.message}`);
+    }
 };
-
-
