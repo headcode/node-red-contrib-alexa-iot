@@ -3,7 +3,7 @@
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const AlexaSmartHome = require('node-red-contrib-alexa-smart-home');
+const AlexaSmartHome = require('node-red-contrib-alexa-smart-home/alexa.js');
 const sanitizeHtml = require('sanitize-html');
 
 module.exports = function(RED) {
@@ -138,3 +138,4 @@ module.exports = function(RED) {
         console.error(`Failed to register alexa-iot-hub node: ${err.message}`);
     }
 };
+
