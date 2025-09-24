@@ -6,7 +6,7 @@
             name: { value: '', required: true },
             hub: { value: '', required: true },
             targetNode: { value: '' },
-            topic: { value: '' } // New field for custom msg.topic
+            topic: { value: '' }
         },
         inputs: 1,
         outputs: 1,
@@ -24,7 +24,6 @@
             document.getElementById('node-input-targetNode').setAttribute('aria-label', 'Enter target node ID');
             document.getElementById('node-input-topic').setAttribute('aria-label', 'Enter custom message topic');
 
-            // Set the textbox values if configured
             document.getElementById('node-input-hub').value = node.hub || '';
             document.getElementById('node-input-targetNode').value = node.targetNode || '';
             document.getElementById('node-input-topic').value = node.topic || '';
@@ -47,8 +46,8 @@
                 RED.notify('Invalid target node ID', 'error');
                 throw new Error('Invalid target node ID');
             }
-            if (topic && !/^[a-zA-Z0-9_-]+$/.test(topic)) {
-                RED.notify('Custom topic must be alphanumeric, underscores, or hyphens', 'error');
+            if (topic && !/^[a-z0-9_., ]+$/.test(topic)) {
+                RED.notify('Topic must be lowercase alphanumeric, underscores, commas, or dots (e.g. light.living_room)', 'error');
                 throw new Error('Invalid custom topic');
             }
             this.hub = hub;
@@ -73,25 +72,25 @@
     </div>
     <div class="form-row">
         <label for="node-input-topic"><i class="fa fa-comment"></i> Topic</label>
-        <input type="text" id="node-input-topic" placeholder="Enter custom message topic (optional)" aria-label="Enter custom message topic">
+        <input type="text" id="node-input-topic" placeholder="Topic (optional)" aria-label="Enter message topic">
     </div>
 </script>
 
 <script type="text/html" data-help-name="alexa-iot-device">
     <h3>Alexa IOT Device</h3>
-    <p>This node receives commands from an Alexa IOT Hub (e.g., for power, brightness, or color) and forwards them to a specified target node or via its output wire.</p>
+    <p>This node receives commands (e.g., for power, brightness, or color) from an Alexa IOT Hub and forwards them to the output and optionally a user specified target node.</p>
     <h4>Configuration</h4>
     <ul>
-        <li><strong>Name</strong>: The device name as it will appear in Alexa (e.g., "Living Room Light"). Required.</li>
+        <li><strong>Name</strong>: The device name as it will appear in Alexa (e.g. "Living Room Light"). Required.</li>
         <li><strong>Hub ID</strong>: The ID of the Alexa IOT Hub node to connect to. Required.</li>
-        <li><strong>Target Node ID</strong>: The ID of another node to forward messages to (optional). Leave blank to use the output wire.</li>
-        <li><strong>Topic</strong>: A custom topic for messages sent by this node (optional). If specified, overrides the default topic (e.g., "power", "brightness", "color"). Must be alphanumeric, underscores, or hyphens.</li>
+        <li><strong>Target Node ID</strong>: The ID of another node to forward messages to (optional). Messages always present on the node output.</li>
+        <li><strong>Topic</strong>: A custom topic for messages sent by this node (optional). If specified, overrides the default topic (e.g. power, brightness, color). Must be lowercase alphanumeric, underscores, commas, or dots. Usefull for Home Assistant entity IDs (e.g. light.hallway, cover.garage).</li>
     </ul>
     <h4>Finding a Node ID</h4>
     <p>To find the ID of a hub or target node:</p>
     <ol>
-        <li><strong>Node Properties</strong>: Double-click a node in the editor. The ID is shown at the bottom of the configuration panel (e.g., "123abc45.678def"). Copy and paste it into the Hub ID or Target Node ID field.</li>
-        <li><strong>Flow JSON</strong>: Click the menu (☰) > Export > Clipboard, select "all flows," and export. Open the JSON in a text editor and find the node’s <code>id</code> field (e.g., <code>"id": "123abc45.678def"</code>).</li>
+        <li><strong>Node Properties</strong>: Double-click a node in the editor. The ID is shown at the bottom of the configuration panel (e.g. "123abc45.678def"). Copy and paste it into the Hub ID or Target Node ID field.</li>
+        <li><strong>Flow JSON</strong>: Click the menu (☰) > Export > Clipboard, select "all flows," and export. Open the JSON in a text editor and find the node’s <code>id</code> field (e.g. <code>"id": "123abc45.678def"</code>).</li>
     </ol>
     <p><strong>Note</strong>: The Hub ID must correspond to an Alexa IOT Hub node, and the Target Node ID (if used) must correspond to a valid node. Invalid IDs or topics will prevent saving the configuration.</p>
 </script>
