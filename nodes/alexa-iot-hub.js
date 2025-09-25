@@ -9,8 +9,10 @@ module.exports = function(RED) {
     const express = require('express');
     const helmet = require('helmet');
     const rateLimit = require('express-rate-limit');
-    const sanitizeHtml = require('sanitize-html');
     const { Server: SSDPServer } = require('node-ssdp');
+    const ip = require('ip');
+    const https = require('https');
+    const fs = require('fs');
 
     function AlexaIotHubNode(config) {
         RED.nodes.createNode(this, config);
@@ -29,36 +31,38 @@ module.exports = function(RED) {
         }));
 
         // SSDP Configuration (Hue Emulation)
-        const localIp = require('ip').address();
+        const localIp = ip.address();
+        const bridgeUuid = `2f402f80-da50-11e1-9b23-${node.id}`;
         const ssdp = new SSDPServer({
             location: `http://${localIp}:${port}/description.xml`,
-            udn: `uuid:2f402f80-da50-11e1-9b23-${node.id}`,
+            udn: `uuid:${bridgeUuid}`,
             sourcePort: 1900,
-            adInterval: 10000,
-            customHeaders: {
-                'hue-bridgeid': node.id.toUpperCase(),
-                'BRIDGEID': node.id.toUpperCase()
-            }
+            adInterval: 30000, // Hue broadcasts every 30s
+            suppressRootDeviceAnnouncements: false
         });
 
         ssdp.addUSN('upnp:rootdevice');
         ssdp.addUSN('urn:schemas-upnp-org:device:basic:1');
-        ssdp.addUSN('urn:philips-hue:device:bridge:1');
-        ssdp.addUSN('ssdp:all');
+        ssdp.addUSN('urn:schemas-upnp-org:device:PhilipsHueBridge:1');
+        ssdp.addUSN(`uuid:${bridgeUuid}`);
+
+        ssdp.addCustomHeader('hue-bridgeid', node.id.toUpperCase());
+        ssdp.addCustomHeader('BRIDGEID', node.id.toUpperCase());
+        ssdp.addCustomHeader('SERVER', 'Linux/3.14.0 UPnP/1.0 PhilipsHue/1.0');
 
         ssdp.on('response', (headers, statusCode, rinfo) => {
-            node.debug(`SSDP response sent to ${rinfo.address}: ${JSON.stringify(headers)}`);
+            if (debug) node.debug(`SSDP response sent to ${rinfo.address}: ${JSON.stringify(headers)}`);
         });
 
         ssdp.on('advertise-alive', (headers) => {
-            node.debug(`SSDP advertise-alive: ${JSON.stringify(headers)}`);
+            if (debug) node.debug(`SSDP advertise-alive: ${JSON.stringify(headers)}`);
         });
 
         // Serve UPnP description.xml
         app.get('/description.xml', (req, res) => {
             res.set('Content-Type', 'text/xml');
             res.send(`
-                <?xml version="1.0"?>
+                <?xml version="1.0" encoding="UTF-8"?>
                 <root xmlns="urn:schemas-upnp-org:device-1-0">
                     <specVersion>
                         <major>1</major>
@@ -66,15 +70,15 @@ module.exports = function(RED) {
                     </specVersion>
                     <URLBase>http://${localIp}:${port}/</URLBase>
                     <device>
-                        <deviceType>urn:philips-hue:device:bridge:1</deviceType>
-                        <friendlyName>Node-RED Alexa Hub (${node.id})</friendlyName>
-                        <manufacturer>Node-RED</manufacturer>
-                        <manufacturerURL>https://nodered.org</manufacturerURL>
-                        <modelDescription>Node-RED Alexa IOT Hub</modelDescription>
+                        <deviceType>urn:schemas-upnp-org:device:PhilipsHueBridge:1</deviceType>
+                        <friendlyName>Philips hue (${localIp})</friendlyName>
+                        <manufacturer>Signify</manufacturer>
+                        <manufacturerURL>https://www.philips-hue.com</manufacturerURL>
+                        <modelDescription>Philips Hue Bridge</modelDescription>
                         <modelName>Philips hue bridge 2015</modelName>
                         <modelNumber>BSB002</modelNumber>
                         <serialNumber>${node.id}</serialNumber>
-                        <UDN>uuid:2f402f80-da50-11e1-9b23-${node.id}</UDN>
+                        <UDN>uuid:${bridgeUuid}</UDN>
                         <iconList>
                             <icon>
                                 <mimetype>image/png</mimetype>
@@ -84,39 +88,30 @@ module.exports = function(RED) {
                                 <url>/icon.png</url>
                             </icon>
                         </iconList>
-                        <serviceList>
-                            <service>
-                                <serviceType>urn:schemas-upnp-org:service:SmartHome:1</serviceType>
-                                <serviceId>urn:upnp-org:serviceId:SmartHome1</serviceId>
-                                <controlURL>/alexa</controlURL>
-                                <eventSubURL>/alexa</eventSubURL>
-                                <SCPDURL>/alexa</SCPDURL>
-                            </service>
-                        </serviceList>
                     </device>
                 </root>
             `);
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Helper function to generate device list
+        // Generate device list (Hue-compatible)
         function generateDeviceList() {
             const lights = {};
             let index = 1;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const uniqueid = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
-                    lights[uniqueid] = {
+                    const uniqueid = `${node.id.slice(0, 8)}:${node.id.slice(8, 12)}:${node.id.slice(12, 16)}:${node.id.slice(16, 20)}:${node.id.slice(20, 24)}:${node.id.slice(24, 28)}:${node.id.slice(28, 32)}:${index}-01`;
+                    lights[index.toString()] = {
                         state: {
                             on: false,
                             bri: 254,
                             hue: 0,
                             sat: 254,
                             effect: 'none',
-                            xy: [0, 0],
-                            ct: 199,
+                            xy: [0.4448, 0.4066],
+                            ct: 153,
                             alert: 'none',
-                            colormode: 'ct',
+                            colormode: 'xy',
                             mode: 'homeautomation',
                             reachable: true
                         },
@@ -125,28 +120,29 @@ module.exports = function(RED) {
                             lastinstall: new Date().toISOString()
                         },
                         type: 'Extended color light',
-                        name: n.name,
-                        modelid: 'LCT007',
-                        manufacturername: 'Philips',
+                        name: n.name || `Light ${index}`,
+                        modelid: 'LCT015',
+                        manufacturername: 'Signify',
                         productname: 'Hue color lamp',
                         capabilities: {
                             certified: true,
                             control: {
-                                mindimlevel: 5000,
-                                maxlumen: 600,
-                                colorgamuttype: 'A',
-                                colorgamut: [[0.675, 0.322], [0.409, 0.518], [0.167, 0.04]],
+                                mindimlevel: 1000,
+                                maxlumen: 800,
+                                colorgamuttype: 'C',
+                                colorgamut: [[0.6915, 0.3083], [0.1367, 0.4041], [0.4, 0.4]],
                                 ct: { min: 153, max: 500 }
                             },
                             streaming: { renderer: true, proxy: false }
                         },
                         config: {
-                            archetype: 'sultanbulb',
+                            archetype: 'huebulb',
                             function: 'mixed',
-                            direction: 'omnidirectional'
+                            direction: 'omnidirectional',
+                            startup: { mode: 'safety', configured: true }
                         },
                         uniqueid: uniqueid,
-                        swversion: '5.105.0.21169'
+                        swversion: '1.46.13_r26312'
                     };
                     index++;
                 }
@@ -154,77 +150,14 @@ module.exports = function(RED) {
             return lights;
         }
 
-        // Serve Hue-like device list at /api/description.xml
-        app.get('/api/description.xml', (req, res) => {
-            node.log(`Hue API description request from ${req.ip}`);
-            const lights = generateDeviceList();
-            const response = {
-                lights: lights,
-                groups: {},
-                config: {
-                    name: 'Philips hue',
-                    zigbeechannel: 25,
-                    bridgeid: node.id.toUpperCase(),
-                    mac: '00:00:00:aa:bb:cc',
-                    dhcp: true,
-                    ipaddress: localIp,
-                    netmask: '0.0.0.0',
-                    gateway: '0.0.0.0',
-                    proxyaddress: 'none',
-                    proxyport: 0,
-                    UTC: new Date().toISOString(),
-                    modelid: 'BSB001',
-                    datastoreversion: '59',
-                    swversion: '01043155',
-                    apiversion: '1.16.0',
-                    swupdate: {
-                        updatestate: 0,
-                        checkforupdate: false,
-                        devicetypes: { bridge: false, lights: [], sensors: [] },
-                        url: '',
-                        text: '',
-                        notify: true
-                    },
-                    linkbutton: false,
-                    portalservices: false,
-                    portalconnection: 'disconnected',
-                    portalstate: {
-                        signedon: false,
-                        incoming: false,
-                        outgoing: false,
-                        communication: 'disconnected'
-                    },
-                    factorynew: false,
-                    replacesbridgeid: null,
-                    backup: { status: 'idle', errorcode: 0 },
-                    whitelist: {
-                        'description.xml': {
-                            'last use date': new Date().toISOString(),
-                            'create date': new Date().toISOString(),
-                            name: 'Echo'
-                        }
-                    }
-                },
-                swupdate2: {
-                    checkforupdate: false,
-                    lastchange: new Date().toISOString(),
-                    bridge: { state: 'noupdates', lastinstall: new Date().toISOString() },
-                    state: 'noupdates',
-                    autoinstall: { updatetime: 'T14:00:00', on: false }
-                },
-                schedules: {}
-            };
-            res.json(response);
-            node.log(`Hue API description response: ${JSON.stringify(response, null, 2)}`);
-        });
-
         // Handle Hue API user creation
         app.post('/api', (req, res) => {
-            node.log(`Hue API user creation request from ${req.ip}`);
+            node.log(`Hue API user creation request from ${req.ip}: ${JSON.stringify(req.body)}`);
+            const devicetype = req.body?.devicetype || 'Echo';
             res.json([{
                 success: {
-                    username: 'node-red-alexa-' + node.id,
-                    clientkey: 'node-red-alexa-' + node.id
+                    username: `node-red-alexa-${node.id}`,
+                    clientkey: `node-red-alexa-${node.id}`
                 }
             }]);
             node.log(`Hue API user created: node-red-alexa-${node.id}`);
@@ -240,29 +173,29 @@ module.exports = function(RED) {
                 groups: {},
                 config: {
                     name: 'Philips hue',
-                    zigbeechannel: 25,
+                    zigbeechannel: 15,
                     bridgeid: node.id.toUpperCase(),
-                    mac: '00:00:00:aa:bb:cc',
+                    mac: '00:17:88:AA:BB:CC',
                     dhcp: true,
                     ipaddress: localIp,
-                    netmask: '0.0.0.0',
-                    gateway: '0.0.0.0',
+                    netmask: '255.255.255.0',
+                    gateway: localIp.split('.').slice(0, 3).join('.') + '.1',
                     proxyaddress: 'none',
                     proxyport: 0,
                     UTC: new Date().toISOString(),
-                    modelid: 'BSB001',
-                    datastoreversion: '59',
-                    swversion: '01043155',
-                    apiversion: '1.16.0',
+                    modelid: 'BSB002',
+                    datastoreversion: '87',
+                    swversion: '1941132080',
+                    apiversion: '1.40.0',
                     swupdate: {
                         updatestate: 0,
                         checkforupdate: false,
                         devicetypes: { bridge: false, lights: [], sensors: [] },
                         url: '',
                         text: '',
-                        notify: true
+                        notify: false
                     },
-                    linkbutton: false,
+                    linkbutton: true,
                     portalservices: false,
                     portalconnection: 'disconnected',
                     portalstate: {
@@ -282,17 +215,14 @@ module.exports = function(RED) {
                         }
                     }
                 },
-                swupdate2: {
-                    checkforupdate: false,
-                    lastchange: new Date().toISOString(),
-                    bridge: { state: 'noupdates', lastinstall: new Date().toISOString() },
-                    state: 'noupdates',
-                    autoinstall: { updatetime: 'T14:00:00', on: false }
-                },
-                schedules: {}
+                schedules: {},
+                scenes: {},
+                rules: {},
+                sensors: {},
+                resourcelinks: {}
             };
             res.json(response);
-            node.log(`Hue API full config response: ${JSON.stringify(response, null, 2)}`);
+            if (debug) node.log(`Hue API full config response: ${JSON.stringify(response, null, 2)}`);
         });
 
         // Handle Hue API config
@@ -300,29 +230,29 @@ module.exports = function(RED) {
             node.log(`Hue API config request from ${req.ip}`);
             res.json({
                 name: 'Philips hue',
-                zigbeechannel: 25,
+                zigbeechannel: 15,
                 bridgeid: node.id.toUpperCase(),
-                mac: '00:00:00:aa:bb:cc',
+                mac: '00:17:88:AA:BB:CC',
                 dhcp: true,
                 ipaddress: localIp,
-                netmask: '0.0.0.0',
-                gateway: '0.0.0.0',
+                netmask: '255.255.255.0',
+                gateway: localIp.split('.').slice(0, 3).join('.') + '.1',
                 proxyaddress: 'none',
                 proxyport: 0,
                 UTC: new Date().toISOString(),
-                modelid: 'BSB001',
-                datastoreversion: '59',
-                swversion: '01043155',
-                apiversion: '1.16.0',
+                modelid: 'BSB002',
+                datastoreversion: '87',
+                swversion: '1941132080',
+                apiversion: '1.40.0',
                 swupdate: {
                     updatestate: 0,
                     checkforupdate: false,
                     devicetypes: { bridge: false, lights: [], sensors: [] },
                     url: '',
                     text: '',
-                    notify: true
+                    notify: false
                 },
-                linkbutton: false,
+                linkbutton: true,
                 portalservices: false,
                 portalconnection: 'disconnected',
                 portalstate: {
@@ -332,17 +262,9 @@ module.exports = function(RED) {
                     communication: 'disconnected'
                 },
                 factorynew: false,
-                replacesbridgeid: null,
-                backup: { status: 'idle', errorcode: 0 },
-                whitelist: {
-                    'description.xml': {
-                        'last use date': new Date().toISOString(),
-                        'create date': new Date().toISOString(),
-                        name: 'Echo'
-                    }
-                }
+                replacesbridgeid: null
             });
-            node.log(`Hue API config response sent`);
+            if (debug) node.log(`Hue API config response sent`);
         });
 
         // Handle Hue API discovery
@@ -351,7 +273,7 @@ module.exports = function(RED) {
             node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
             const lights = generateDeviceList();
             res.json(lights);
-            node.log(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
+            if (debug) node.log(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
         });
 
         // Handle Hue API single light probe
@@ -360,24 +282,13 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
             const lights = generateDeviceList();
-            let light = lights[deviceId];
-
-            if (!light) {
-                RED.nodes.eachNode(n => {
-                    if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                        const id = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
-                        if (deviceId === id || deviceId === n.endpointId || deviceId === n.id) {
-                            light = lights[id];
-                        }
-                    }
-                });
-            }
+            const light = lights[deviceId];
 
             if (light) {
                 res.json(light);
-                node.log(`Hue API light response: ${JSON.stringify(light, null, 2)}`);
+                if (debug) node.log(`Hue API light response: ${JSON.stringify(light, null, 2)}`);
             } else {
-                res.status(404).json({ error: `Device ${deviceId} not found` });
+                res.status(404).json([{ error: { type: 1, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
                 node.log(`Hue API light not found: ${deviceId}`);
             }
         });
@@ -388,22 +299,19 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             const body = req.body;
             node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
-            const lights = generateDeviceList();
-            let deviceNode = null;
-            let matchedId = null;
 
+            let deviceNode = null;
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const id = (n.endpointId || n.id).replace(/-/g, ':') + '-00';
-                    if (deviceId === id || deviceId === n.endpointId || deviceId === n.id) {
+                    const id = n.id;
+                    if (deviceId === id || deviceId === n.endpointId || deviceId === String(RED.nodes.getNode(n.id).index)) {
                         deviceNode = RED.nodes.getNode(n.id);
-                        matchedId = id;
                     }
                 }
             });
 
             if (!deviceNode) {
-                res.status(404).json([{ error: { type: 3, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
+                res.status(404).json([{ error: { type: 1, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
                 node.log(`Hue API control failed: Device ${deviceId} not found`);
                 return;
             }
@@ -414,7 +322,7 @@ module.exports = function(RED) {
                 payload = body.on ? 'ON' : 'OFF';
             } else if (body.bri !== undefined) {
                 topic = 'brightness';
-                payload = Math.round((body.bri / 254) * 100); // Hue bri: 0-254, Alexa: 0-100
+                payload = Math.round((body.bri / 254) * 100);
             } else if (body.hue !== undefined && body.sat !== undefined) {
                 topic = 'color';
                 payload = { hue: body.hue, saturation: body.sat / 254, brightness: (body.bri || 254) / 254 };
@@ -428,7 +336,7 @@ module.exports = function(RED) {
 
             if (topic && payload) {
                 deviceNode.receive({ topic, payload });
-                res.json([{ success: { [`/lights/${deviceId}/state/${topic}`]: payload } }]);
+                res.json([{ success: { [`/lights/${deviceId}/state/${Object.keys(body)[0]}`]: body[Object.keys(body)[0]] } }]);
                 node.log(`Hue API control success: topic=${topic}, payload=${JSON.stringify(payload)}`);
             } else {
                 res.status(400).json([{ error: { type: 6, address: `/lights/${deviceId}/state`, description: 'Invalid or missing parameters' } }]);
@@ -438,252 +346,34 @@ module.exports = function(RED) {
 
         // Log all requests
         app.use((req, res, next) => {
-            node.log(`Request from ${req.ip}: ${req.method} ${req.url} Headers: ${JSON.stringify(req.headers)}`);
+            if (debug) node.log(`Request from ${req.ip}: ${req.method} ${req.url} Headers: ${JSON.stringify(req.headers)}`);
             next();
         });
 
-        // Handle unexpected GET /
+        // Handle root endpoint
         app.get('/', (req, res) => {
-            res.status(404).json({ error: 'Not found, use POST /alexa for Alexa directives' });
+            res.status(404).json({ error: 'Not found, use Hue API endpoints' });
         });
 
-        app.post('/alexa', (req, res) => {
-            try {
-                const directive = req.body?.directive;
-                if (!directive || !directive.header || !directive.header.namespace) {
-                    res.status(400).json({
-                        event: {
-                            header: {
-                                namespace: 'Alexa',
-                                name: 'ErrorResponse',
-                                payloadVersion: '3',
-                                messageId: directive?.header?.messageId || 'unknown'
-                            },
-                            payload: {
-                                type: 'INVALID_DIRECTIVE',
-                                message: 'Missing or invalid directive'
-                            }
-                        }
-                    });
-                    return;
-                }
-
-                const { namespace, name, messageId, correlationToken } = directive.header;
-                const endpointId = directive.endpoint?.endpointId;
-
-                if (namespace === 'Alexa.Discovery' && name === 'Discover') {
-                    const devices = [];
-                    RED.nodes.eachNode(n => {
-                        if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                            devices.push({
-                                endpointId: n.endpointId || n.id,
-                                friendlyName: n.name,
-                                description: `Node-RED ${n.name}`,
-                                manufacturerName: 'Node-RED',
-                                displayCategories: ['LIGHT', 'SWITCH'],
-                                capabilities: [
-                                    {
-                                        type: 'AlexaInterface',
-                                        interface: 'Alexa',
-                                        version: '3'
-                                    },
-                                    {
-                                        type: 'AlexaInterface',
-                                        interface: 'Alexa.PowerController',
-                                        version: '3',
-                                        properties: {
-                                            supported: [{ name: 'powerState' }],
-                                            proactivelyReported: false,
-                                            retrievable: true
-                                        }
-                                    },
-                                    {
-                                        type: 'AlexaInterface',
-                                        interface: 'Alexa.BrightnessController',
-                                        version: '3',
-                                        properties: {
-                                            supported: [{ name: 'brightness' }],
-                                            proactivelyReported: false,
-                                            retrievable: true
-                                        }
-                                    },
-                                    {
-                                        type: 'AlexaInterface',
-                                        interface: 'Alexa.ColorController',
-                                        version: '3',
-                                        properties: {
-                                            supported: [{ name: 'color' }],
-                                            proactivelyReported: false,
-                                            retrievable: true
-                                        }
-                                    }
-                                ]
-                            });
-                        }
-                    });
-
-                    res.json({
-                        event: {
-                            header: {
-                                namespace: 'Alexa.Discovery',
-                                name: 'Discover.Response',
-                                payloadVersion: '3',
-                                messageId
-                            },
-                            payload: { endpoints: devices }
-                        }
-                    });
-
-                    if (debug) {
-                        node.log(`Discovery response: ${JSON.stringify(devices, null, 2)}`);
-                    }
-                    return;
-                }
-
-                if (!endpointId) {
-                    res.status(400).json({
-                        event: {
-                            header: {
-                                namespace: 'Alexa',
-                                name: 'ErrorResponse',
-                                payloadVersion: '3',
-                                messageId,
-                                correlationToken
-                            },
-                            payload: {
-                                type: 'INVALID_DIRECTIVE',
-                                message: 'Missing endpointId'
-                            }
-                        }
-                    });
-                    return;
-                }
-
-                let deviceNode = null;
-                RED.nodes.eachNode(n => {
-                    if (n.type === 'alexa-iot-device' && (n.endpointId || n.id) === endpointId && RED.nodes.getNode(n.hub) === node) {
-                        deviceNode = RED.nodes.getNode(n.id);
-                    }
-                });
-
-                if (!deviceNode) {
-                    res.status(404).json({
-                        event: {
-                            header: {
-                                namespace: 'Alexa',
-                                name: 'ErrorResponse',
-                                payloadVersion: '3',
-                                messageId,
-                                correlationToken
-                            },
-                            payload: {
-                                type: 'ENDPOINT_UNREACHABLE',
-                                message: `Device ${endpointId} not found`
-                            }
-                        }
-                    });
-                    return;
-                }
-
-                let topic, payload;
-                if (namespace === 'Alexa.PowerController' && (name === 'TurnOn' || name === 'TurnOff')) {
-                    topic = 'power';
-                    payload = name === 'TurnOn' ? 'ON' : 'OFF';
-                } else if (namespace === 'Alexa.BrightnessController' && name === 'SetBrightness') {
-                    topic = 'brightness';
-                    payload = directive.payload.brightness;
-                } else if (namespace === 'Alexa.BrightnessController' && name === 'AdjustBrightness') {
-                    topic = 'brightness';
-                    payload = directive.payload.brightnessDelta;
-                } else if (namespace === 'Alexa.ColorController' && name === 'SetColor') {
-                    topic = 'color';
-                    payload = directive.payload.color;
-                } else {
-                    res.status(400).json({
-                        event: {
-                            header: {
-                                namespace: 'Alexa',
-                                name: 'ErrorResponse',
-                                payloadVersion: '3',
-                                messageId,
-                                correlationToken
-                            },
-                            payload: {
-                                type: 'INVALID_DIRECTIVE',
-                                message: `Unsupported directive: ${namespace}.${name}`
-                            }
-                        }
-                    });
-                    return;
-                }
-
-                deviceNode.receive({ topic, payload });
-
-                res.json({
-                    event: {
-                        header: {
-                            namespace: 'Alexa',
-                            name: 'Response',
-                            payloadVersion: '3',
-                            messageId,
-                            correlationToken
-                        },
-                        endpoint: { endpointId },
-                        payload: {}
-                    },
-                    context: {
-                        properties: [
-                            namespace === 'Alexa.PowerController' ? {
-                                namespace: 'Alexa.PowerController',
-                                name: 'powerState',
-                                value: payload,
-                                timeOfSample: new Date().toISOString(),
-                                uncertaintyInMilliseconds: 0
-                            } : namespace === 'Alexa.BrightnessController' ? {
-                                namespace: 'Alexa.BrightnessController',
-                                name: 'brightness',
-                                value: payload,
-                                timeOfSample: new Date().toISOString(),
-                                uncertaintyInMilliseconds: 0
-                            } : {
-                                namespace: 'Alexa.ColorController',
-                                name: 'color',
-                                value: payload,
-                                timeOfSample: new Date().toISOString(),
-                                uncertaintyInMilliseconds: 0
-                            }
-                        ]
-                    }
-                });
-
-                if (debug) {
-                    node.log(`Processed ${namespace}.${name} for ${endpointId}: topic=${topic}, payload=${JSON.stringify(payload)}`);
-                }
-            } catch (err) {
-                node.error(`Error processing directive: ${err.message}`);
-                res.status(500).json({
-                    event: {
-                        header: {
-                            namespace: 'Alexa',
-                            name: 'ErrorResponse',
-                            payloadVersion: '3',
-                            messageId: directive?.header?.messageId || 'unknown'
-                        },
-                        payload: {
-                            type: 'INTERNAL_ERROR',
-                            message: `Internal server error: ${err.message}`
-                        }
-                    }
-                });
-            }
-        });
-
+        // Start server (HTTP or HTTPS)
         let server;
         try {
-            server = app.listen(port, () => {
-                node.log(`Alexa IOT Hub listening on port ${port}`);
-                node.status({ fill: 'green', shape: 'dot', text: `listening on ${port}` });
-            });
+            if (port === 443 && fs.existsSync('./key.pem') && fs.existsSync('./cert.pem')) {
+                server = https.createServer({
+                    key: fs.readFileSync('./key.pem'),
+                    cert: fs.readFileSync('./cert.pem')
+                }, app).listen(port, () => {
+                    node.log(`Alexa IOT Hub listening on HTTPS port ${port}`);
+                    node.status({ fill: 'green', shape: 'dot', text: `listening on ${port} (HTTPS)` });
+                });
+            } else {
+                server = app.listen(port, () => {
+                    node.log(`Alexa IOT Hub listening on HTTP port ${port}`);
+                    node.status({ fill: 'green', shape: 'dot', text: `listening on ${port}` });
+                });
+            }
+            ssdp.start();
+            node.log('SSDP server started');
         } catch (err) {
             node.error(`Failed to start server on port ${port}: ${err.message}`);
             node.status({ fill: 'red', shape: 'ring', text: `error: ${err.message}` });
