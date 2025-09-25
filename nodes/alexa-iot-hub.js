@@ -23,6 +23,7 @@ module.exports = function(RED) {
         const debug = config.debug || false;
         const certPath = config.certPath || path.join(RED.settings.userDir, 'server.cert');
         const keyPath = config.keyPath || path.join(RED.settings.userDir, 'server.key');
+        node.validUsername = `node-red-alexa-${node.id}`; // Store expected username
 
         const app = express();
         app.use(helmet());
@@ -290,6 +291,11 @@ module.exports = function(RED) {
         app.get('/api/:userId/lights', (req, res) => {
             const userId = req.params.userId;
             node.log(`Hue API discovery request from ${req.ip} for user ${userId}`);
+            if (userId !== node.validUsername) {
+                node.warn(`Invalid userId ${userId}, expected ${node.validUsername}`);
+                res.status(401).json([{ error: { type: 1, address: '', description: 'unauthorized user' } }]);
+                return;
+            }
             const lights = generateDeviceList();
             res.json(lights);
             if (debug) node.log(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
@@ -300,6 +306,11 @@ module.exports = function(RED) {
             const userId = req.params.userId;
             const deviceId = req.params.deviceId;
             node.log(`Hue API light probe from ${req.ip} for user ${userId}, device ${deviceId}`);
+            if (userId !== node.validUsername) {
+                node.warn(`Invalid userId ${userId}, expected ${node.validUsername}`);
+                res.status(401).json([{ error: { type: 1, address: '', description: 'unauthorized user' } }]);
+                return;
+            }
             const lights = generateDeviceList();
             const light = lights[deviceId];
 
@@ -318,6 +329,11 @@ module.exports = function(RED) {
             const deviceId = req.params.deviceId;
             const body = req.body;
             node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
+            if (userId !== node.validUsername) {
+                node.warn(`Invalid userId ${userId}, expected ${node.validUsername}`);
+                res.status(401).json([{ error: { type: 1, address: '', description: 'unauthorized user' } }]);
+                return;
+            }
 
             generateDeviceList(); // Refresh device map
             const deviceNodeId = Object.keys(node.deviceMap).find(key => node.deviceMap[key] === deviceId);
@@ -422,3 +438,4 @@ module.exports = function(RED) {
         console.error(`Failed to register alexa-iot-hub node: ${err.message}`);
     }
 };
+
