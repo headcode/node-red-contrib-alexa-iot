@@ -12,13 +12,17 @@ module.exports = function(RED) {
     const { Server: SSDPServer } = require('node-ssdp');
     const ip = require('ip');
     const https = require('https');
+    const http = require('http');
     const fs = require('fs');
+    const path = require('path');
 
     function AlexaIotHubNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
         const port = parseInt(config.port, 10) || 80;
         const debug = config.debug || false;
+        const certPath = config.certPath || path.join(RED.settings.userDir, 'server.cert');
+        const keyPath = config.keyPath || path.join(RED.settings.userDir, 'server.key');
 
         const app = express();
         app.use(helmet());
@@ -34,7 +38,7 @@ module.exports = function(RED) {
         const localIp = ip.address();
         const bridgeUuid = `2f402f80-da50-11e1-9b23-${node.id}`;
         const ssdp = new SSDPServer({
-            location: `http://${localIp}:${port}/description.xml`,
+            location: `http://${localIp}:${port}/description.xml`,  // Use HTTPS in location if port 443
             udn: `uuid:${bridgeUuid}`,
             sourcePort: 1900,
             adInterval: 30000, // Hue broadcasts every 30s
@@ -60,6 +64,7 @@ module.exports = function(RED) {
 
         // Serve UPnP description.xml
         app.get('/description.xml', (req, res) => {
+            const protocol = port === 443 ? 'https' : 'http';
             res.set('Content-Type', 'text/xml');
             res.send(`
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -68,7 +73,7 @@ module.exports = function(RED) {
                         <major>1</major>
                         <minor>0</minor>
                     </specVersion>
-                    <URLBase>http://${localIp}:${port}/</URLBase>
+                    <URLBase>${protocol}://${localIp}:${port}/</URLBase>
                     <device>
                         <deviceType>urn:schemas-upnp-org:device:PhilipsHueBridge:1</deviceType>
                         <friendlyName>Philips hue (${localIp})</friendlyName>
@@ -94,13 +99,14 @@ module.exports = function(RED) {
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Generate device list (Hue-compatible)
+        // Generate device list (Hue-compatible) with sequential indexing
         function generateDeviceList() {
             const lights = {};
             let index = 1;
+            const deviceMap = {};  // Map node.id to index for lookup
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const uniqueid = `${node.id.slice(0, 8)}:${node.id.slice(8, 12)}:${node.id.slice(12, 16)}:${node.id.slice(16, 20)}:${node.id.slice(20, 24)}:${node.id.slice(24, 28)}:${node.id.slice(28, 32)}:${index}-01`;
+                    const uniqueid = `${node.id.slice(0, 8)}:${node.id.slice(8, 12)}:${node.id.slice(12, 16)}:${node.id.slice(16, 20)}:${node.id.slice(20, 24)}:${node.id.slice(24, 28)}:${node.id.slice(28, 32)}:${index.toString(16).padStart(2, '0')}-01`;
                     lights[index.toString()] = {
                         state: {
                             on: false,
@@ -144,9 +150,11 @@ module.exports = function(RED) {
                         uniqueid: uniqueid,
                         swversion: '1.46.13_r26312'
                     };
+                    deviceMap[n.id] = index.toString();
                     index++;
                 }
             });
+            node.deviceMap = deviceMap;  // Store for control lookup
             return lights;
         }
 
@@ -300,15 +308,12 @@ module.exports = function(RED) {
             const body = req.body;
             node.log(`Hue API control request from ${req.ip} for user ${userId}, device ${deviceId}: ${JSON.stringify(body)}`);
 
+            generateDeviceList();  // Refresh map
+            const deviceNodeId = Object.keys(node.deviceMap).find(key => node.deviceMap[key] === deviceId);
             let deviceNode = null;
-            RED.nodes.eachNode(n => {
-                if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const id = n.id;
-                    if (deviceId === id || deviceId === n.endpointId || deviceId === String(RED.nodes.getNode(n.id).index)) {
-                        deviceNode = RED.nodes.getNode(n.id);
-                    }
-                }
-            });
+            if (deviceNodeId) {
+                deviceNode = RED.nodes.getNode(deviceNodeId);
+            }
 
             if (!deviceNode) {
                 res.status(404).json([{ error: { type: 1, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
@@ -357,17 +362,30 @@ module.exports = function(RED) {
 
         // Start server (HTTP or HTTPS)
         let server;
+        const protocol = port === 443 ? 'https' : 'http';
+        const locationProtocol = port === 443 ? 'https' : 'http';
+        ssdp.location = `${locationProtocol}://${localIp}:${port}/description.xml`;  // Update SSDP location dynamically
+
         try {
-            if (port === 443 && fs.existsSync('./key.pem') && fs.existsSync('./cert.pem')) {
-                server = https.createServer({
-                    key: fs.readFileSync('./key.pem'),
-                    cert: fs.readFileSync('./cert.pem')
-                }, app).listen(port, () => {
-                    node.log(`Alexa IOT Hub listening on HTTPS port ${port}`);
-                    node.status({ fill: 'green', shape: 'dot', text: `listening on ${port} (HTTPS)` });
-                });
+            if (port === 443) {
+                if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+                    const options = {
+                        key: fs.readFileSync(keyPath),
+                        cert: fs.readFileSync(certPath)
+                    };
+                    server = https.createServer(options, app).listen(port, () => {
+                        node.log(`Alexa IOT Hub listening on HTTPS port ${port}`);
+                        node.status({ fill: 'green', shape: 'dot', text: `listening on ${port} (HTTPS)` });
+                    });
+                } else {
+                    node.warn(`HTTPS requested (port 443) but certs not found at ${keyPath} or ${certPath}. Falling back to HTTP on port 443 (insecure). Generate certs for secure HTTPS.`);
+                    server = http.createServer(app).listen(port, () => {
+                        node.log(`Alexa IOT Hub listening on HTTP port ${port} (insecure fallback)`);
+                        node.status({ fill: 'yellow', shape: 'ring', text: `listening on ${port} (HTTP fallback)` });
+                    });
+                }
             } else {
-                server = app.listen(port, () => {
+                server = http.createServer(app).listen(port, () => {
                     node.log(`Alexa IOT Hub listening on HTTP port ${port}`);
                     node.status({ fill: 'green', shape: 'dot', text: `listening on ${port}` });
                 });
