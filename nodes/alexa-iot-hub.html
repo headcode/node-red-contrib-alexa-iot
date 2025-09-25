@@ -21,8 +21,14 @@
             document.getElementById('node-input-name').setAttribute('aria-label', 'Node name');
             document.getElementById('node-input-port').setAttribute('aria-label', 'Port number for Alexa service');
             document.getElementById('node-input-debug').setAttribute('aria-label', 'Enable debug mode');
+            document.getElementById('node-input-certPath').value = node.certPath || '';
+            document.getElementById('node-input-keyPath').value = node.keyPath || '';
         },
         oneditsave: function() {
+            const certPath = document.getElementById('node-input-certPath').value.trim();
+            const keyPath = document.getElementById('node-input-keyPath').value.trim();
+            this.certPath = certPath || undefined;
+            this.keyPath = keyPath || undefined;
             const port = parseInt(document.getElementById('node-input-port').value, 10);
             if (isNaN(port) || port < 1 || port > 65535) {
                 RED.notify('Invalid port number: Must be between 1 and 65535', 'error');
@@ -42,9 +48,17 @@
         <input type="number" id="node-input-port" placeholder="80" aria-label="Port number for Alexa service">
     </div>
     <div class="form-row">
-        <label for="node-input-debug"><i class="fa fa-bug"></i> Debug</label>
-        <input type="checkbox" id="node-input-debug" aria-label="Enable debug mode">
-    </div>
+    <label for="node-input-certPath"><i class="fa fa-certificate"></i> Cert Path (for HTTPS)</label>
+    <input type="text" id="node-input-certPath" placeholder="./server.cert" aria-label="Path to SSL certificate file (optional)">
+</div>
+<div class="form-row">
+    <label for="node-input-keyPath"><i class="fa fa-key"></i> Key Path (for HTTPS)</label>
+    <input type="text" id="node-input-keyPath" placeholder="./server.key" aria-label="Path to SSL key file (optional)">
+</div>
+<div class="form-row">
+    <label for="node-input-debug"><i class="fa fa-bug"></i> Debug</label>
+    <input type="checkbox" id="node-input-debug" aria-label="Enable debug mode">
+</div>
 </script>
 
 <script type="text/html" data-help-name="alexa-iot-hub">
@@ -54,6 +68,7 @@
     <ul>
         <li><strong>Name</strong>: Optional name for the hub (e.g., "Alexa Hub"). Appears in the Node-RED editor.</li>
         <li><strong>Port</strong>: The TCP port to listen for Alexa requests (default: 80). Must be a number between 1 and 65535. Required.</li>
+        <li><strong>Path</strong>: Cert Path/Key Path: Optional paths to SSL cert/key files for HTTPS on port 443 (relative to Node-RED user dir).</li>
         <li><strong>Debug</strong>: Check to enable debug logging for Alexa commands (useful for troubleshooting).</li>
     </ul>
     <p><strong>Note</strong>: Ensure the port is not used by other services. If the port is invalid or unavailable, the hub will fail to start, and an error will appear in the Node-RED logs.</p>
@@ -78,3 +93,4 @@
         border-radius: 3px;
     }
 </style>
+
