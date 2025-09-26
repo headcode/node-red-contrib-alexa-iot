@@ -44,7 +44,7 @@ module.exports = function(RED) {
                 location: `${port === 443 ? 'https' : 'http'}://${localIp}:${port}/description.xml`,
                 udn: `uuid:${bridgeUuid}`,
                 sourcePort: 1900,
-                adInterval: 30000, // Hue broadcasts every 30s
+                adInterval: 30000,
                 suppressRootDeviceAnnouncements: false,
                 headers: {
                     'hue-bridgeid': node.id.toUpperCase(),
@@ -111,15 +111,14 @@ module.exports = function(RED) {
             node.log(`Served description.xml to ${req.ip}`);
         });
 
-        // Generate device list (Hue-compatible)
+        // Generate device list (Hue-compatible) - Use device node ID as light key
         function generateDeviceList() {
             const lights = {};
-            let index = 1;
-            const deviceMap = {};
             RED.nodes.eachNode(n => {
                 if (n.type === 'alexa-iot-device' && RED.nodes.getNode(n.hub) === node) {
-                    const uniqueid = `${node.id.slice(0, 8)}:${node.id.slice(8, 12)}:${node.id.slice(12, 16)}:${node.id.slice(16, 20)}:${node.id.slice(20, 24)}:${node.id.slice(24, 28)}:${node.id.slice(28, 32)}:${index.toString(16).padStart(2, '0')}-01`;
-                    lights[index.toString()] = {
+                    const deviceId = n.id; // Use Node-RED node ID directly as light key
+                    const uniqueid = `${node.id.slice(0, 8)}:${node.id.slice(8, 12)}:${node.id.slice(12, 16)}:${node.id.slice(16, 20)}:${node.id.slice(20, 24)}:${node.id.slice(24, 28)}:${node.id.slice(28, 32)}:${deviceId.slice(0, 2)}-01`; // Hue-like uniqueid
+                    lights[deviceId] = {
                         state: {
                             on: false,
                             bri: 254,
@@ -138,7 +137,7 @@ module.exports = function(RED) {
                             lastinstall: new Date().toISOString()
                         },
                         type: 'Extended color light',
-                        name: n.name || `Light ${index}`,
+                        name: n.name || `Light ${deviceId.slice(0, 8)}`,
                         modelid: 'LCT015',
                         manufacturername: 'Signify',
                         productname: 'Hue color lamp',
@@ -162,11 +161,9 @@ module.exports = function(RED) {
                         uniqueid: uniqueid,
                         swversion: '1.46.13_r26312'
                     };
-                    deviceMap[n.id] = index.toString();
-                    index++;
                 }
             });
-            node.deviceMap = deviceMap;
+            if (debug) node.debug(`Generated device list with direct node IDs: ${JSON.stringify(Object.keys(lights), null, 2)}`);
             return lights;
         }
 
@@ -176,17 +173,22 @@ module.exports = function(RED) {
             const devicetype = req.body?.devicetype || 'Echo';
             res.json([{
                 success: {
-                    username: `node-red-alexa-${node.id}`,
-                    clientkey: `node-red-alexa-${node.id}`
+                    username: node.validUsername,
+                    clientkey: node.validUsername
                 }
             }]);
-            node.log(`Hue API user created: node-red-alexa-${node.id}`);
+            node.log(`Hue API user created: ${node.validUsername}`);
         });
 
         // Handle Hue API full config
         app.get('/api/:userId', (req, res) => {
             const userId = req.params.userId;
             node.log(`Hue API full config request from ${req.ip} for user ${userId}`);
+            if (userId !== node.validUsername) {
+                node.warn(`Invalid userId ${userId}, expected ${node.validUsername}`);
+                res.status(401).json([{ error: { type: 1, address: '', description: 'unauthorized user' } }]);
+                return;
+            }
             const lights = generateDeviceList();
             const response = {
                 lights: lights,
@@ -242,7 +244,7 @@ module.exports = function(RED) {
                 resourcelinks: {}
             };
             res.json(response);
-            if (debug) node.log(`Hue API full config response: ${JSON.stringify(response, null, 2)}`);
+            if (debug) node.debug(`Hue API full config response: ${JSON.stringify(response, null, 2)}`);
         });
 
         // Handle Hue API config
@@ -284,7 +286,7 @@ module.exports = function(RED) {
                 factorynew: false,
                 replacesbridgeid: null
             });
-            if (debug) node.log(`Hue API config response sent`);
+            if (debug) node.debug(`Hue API config response sent`);
         });
 
         // Handle Hue API discovery
@@ -298,7 +300,8 @@ module.exports = function(RED) {
             }
             const lights = generateDeviceList();
             res.json(lights);
-            if (debug) node.log(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
+            node.log(`Hue API lights response sent with ${Object.keys(lights).length} devices`);
+            if (debug) node.debug(`Hue API lights response: ${JSON.stringify(lights, null, 2)}`);
         });
 
         // Handle Hue API single light probe
@@ -316,10 +319,11 @@ module.exports = function(RED) {
 
             if (light) {
                 res.json(light);
-                if (debug) node.log(`Hue API light response: ${JSON.stringify(light, null, 2)}`);
+                node.log(`Hue API light response sent for device ${deviceId}`);
+                if (debug) node.debug(`Hue API light response: ${JSON.stringify(light, null, 2)}`);
             } else {
+                node.warn(`Hue API light not found: ${deviceId}. Available IDs: ${Object.keys(lights).join(', ')}`);
                 res.status(404).json([{ error: { type: 1, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
-                node.log(`Hue API light not found: ${deviceId}`);
             }
         });
 
@@ -335,16 +339,10 @@ module.exports = function(RED) {
                 return;
             }
 
-            generateDeviceList(); // Refresh device map
-            const deviceNodeId = Object.keys(node.deviceMap).find(key => node.deviceMap[key] === deviceId);
-            let deviceNode = null;
-            if (deviceNodeId) {
-                deviceNode = RED.nodes.getNode(deviceNodeId);
-            }
-
-            if (!deviceNode) {
+            const deviceNode = RED.nodes.getNode(deviceId); // Direct lookup using deviceId as node ID
+            if (!deviceNode || deviceNode.type !== 'alexa-iot-device') {
+                node.warn(`Hue API control failed: Device ${deviceId} not found or invalid type. Available device IDs: ${Object.keys(generateDeviceList()).join(', ')}`);
                 res.status(404).json([{ error: { type: 1, address: `/lights/${deviceId}`, description: `Device ${deviceId} not found` } }]);
-                node.log(`Hue API control failed: Device ${deviceId} not found`);
                 return;
             }
 
@@ -371,8 +369,8 @@ module.exports = function(RED) {
                 res.json([{ success: { [`/lights/${deviceId}/state/${Object.keys(body)[0]}`]: body[Object.keys(body)[0]] } }]);
                 node.log(`Hue API control success: topic=${topic}, payload=${JSON.stringify(payload)}`);
             } else {
+                node.warn(`Hue API control failed: Invalid or missing parameters in ${JSON.stringify(body)}`);
                 res.status(400).json([{ error: { type: 6, address: `/lights/${deviceId}/state`, description: 'Invalid or missing parameters' } }]);
-                node.log(`Hue API control failed: Invalid or missing parameters`);
             }
         });
 
@@ -438,4 +436,3 @@ module.exports = function(RED) {
         console.error(`Failed to register alexa-iot-hub node: ${err.message}`);
     }
 };
-
