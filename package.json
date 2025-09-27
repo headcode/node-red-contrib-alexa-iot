@@ -1,7 +1,7 @@
 {
     "name": "node-red-contrib-alexa-iot",
     "version": "0.2.1",
-    "description": "Create Node-RED device nodes to be controlled by Amazon Echo devices as a Philips Hue bridge, no Alexa Skills or cloud dependencies required",
+    "description": "Emulate a Philips Hue bridge and create Node-RED device nodes to be controlled locally by Amazon Echo devices. No Alexa Skills or cloud dependencies required",
     "main": "nodes/alexa-iot-hub.js",
     "scripts": {
         "test": "mocha test/**/*_spec.js --exit"
