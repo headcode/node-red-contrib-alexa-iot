@@ -90,7 +90,7 @@
     <h4>Configuration</h4>
     <ul>
         <li><strong>Name</strong>: The device name as it will appear in Alexa (e.g. "Living Room Light"). Required</li>
-        <li><strong>Hub ID</strong>: The ID of the Alexa IOT Hub node to connect to. If exactly one Alexa IOT Hub exists in the project (on any flow tab), this field is auto-filled with its ID. If no or multiple hubs exist, it is left empty for user to define. Required</li>
+        <li><strong>Hub ID</strong>: The ID of the Alexa IOT Hub node to connect to. If one Hub exists in the project, this field is auto-filled with its ID. If zero or multiple hubs exist, it is left empty for the user to define. Required</li>
         <li><strong>Target Node ID</strong>: The ID of another node to forward messages to (optional). Messages always present on the node output.</li>
         <li><strong>Topic</strong>: A custom topic for messages sent by this node (optional). If specified, overrides the default topic (e.g. power, brightness, color). Must be lowercase alphanumeric, underscores, commas, or dots. Useful for Home Assistant entity IDs (e.g. light.hallway, cover.garage).</li>
     </ul>
@@ -122,3 +122,4 @@
         border-radius: 3px;
     }
 </style>
+
